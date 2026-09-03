@@ -82,6 +82,16 @@ def main() -> None:
     with open(os.path.join(deck_dir, "slides", "_nav.js"), encoding="utf-8") as f:
         nav_js = f.read()
 
+    # _editable.js (modo edición) es más nuevo que este script y sólo lo
+    # referencian ALGUNAS láminas (perfil.html, insights.html): a diferencia
+    # de _nav.js no puede ser obligatorio, o un deck generado antes de esta
+    # feature (sin ese archivo en slides/) rompería el empaquetado.
+    editable_js_path = os.path.join(deck_dir, "slides", "_editable.js")
+    editable_js = None
+    if os.path.isfile(editable_js_path):
+        with open(editable_js_path, encoding="utf-8") as f:
+            editable_js = f.read()
+
     logo_pos = data_uri(os.path.join(deck_dir, "assets", "logo-horizontal-positivo.svg"))
     logo_neg = data_uri(os.path.join(deck_dir, "assets", "logo-horizontal-negativo.svg"))
 
@@ -101,6 +111,11 @@ def main() -> None:
         text = text.replace("location.search", "location.hash.slice(1)")
         exigir(text, '<script src="_nav.js"></script>', fname)
         text = text.replace('<script src="_nav.js"></script>', "<script>\n" + nav_js + "\n</script>")
+        if editable_js is not None and '<script src="_editable.js"></script>' in text:
+            # _editable.js también lee location.search (?edit=/&edits=): tiene que
+            # pasar por el mismo cambio a location.hash que el resto de la lámina.
+            editable_js_hash = editable_js.replace("location.search", "location.hash.slice(1)")
+            text = text.replace('<script src="_editable.js"></script>', "<script>\n" + editable_js_hash + "\n</script>")
         exigir(text, '<script src="../data/proceso.js"></script>', fname)
         text = text.replace('<script src="../data/proceso.js"></script>', "<script>\n" + proceso_js + "\n</script>")
         text = text.replace('src="../assets/logo-horizontal-positivo.svg"', f'src="{logo_pos}"')
@@ -110,13 +125,17 @@ def main() -> None:
     with open(os.path.join(deck_dir, "deck.html"), encoding="utf-8") as f:
         shell = f.read()
 
-    marca_cargar = "cargar('slides/'+s.file+'?b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+(atEnd ? '&at=end' : ''));"
+    marca_cargar = "cargar('slides/'+s.file+'?b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+'&edit='+(editMode?1:0)+editsQS+((atEnd||editMode) ? '&at=end' : ''));"
     marca_cv = "cvFrame.src = 'slides/cv.html?b='+BUILD+'&theme='+theme+'&'+s.cv;"
     for frag in ('<script src="data/proceso.js"></script>', 'src="assets/logo-horizontal-positivo.svg"',
                  'src="assets/logo-horizontal-negativo.svg"', marca_cargar, marca_cv, "const BUILD = "):
         exigir(shell, frag, "deck.html")
 
     shell = shell.replace('<script src="data/proceso.js"></script>', "<script>\n" + proceso_js + "\n</script>")
+    # Igual que en las láminas: _editable.js es opcional (decks generados
+    # antes de esta feature no traen esa etiqueta en deck.html).
+    if editable_js is not None and '<script src="slides/_editable.js"></script>' in shell:
+        shell = shell.replace('<script src="slides/_editable.js"></script>', "<script>\n" + editable_js + "\n</script>")
     shell = shell.replace('src="assets/logo-horizontal-positivo.svg"', f'src="{logo_pos}"')
     shell = shell.replace('src="assets/logo-horizontal-negativo.svg"', f'src="{logo_neg}"')
 
@@ -125,7 +144,7 @@ def main() -> None:
     ) + "\n};\nfunction slideSrc(file){ return 'data:text/html;base64,' + SLIDE_B64[file]; }\n"
     shell = shell.replace("const BUILD = ", mapa + "const BUILD = ", 1)
 
-    shell = shell.replace(marca_cargar, "cargar(slideSrc(s.file)+'#b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+(atEnd ? '&at=end' : ''));")
+    shell = shell.replace(marca_cargar, "cargar(slideSrc(s.file)+'#b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+'&edit='+(editMode?1:0)+editsQS+((atEnd||editMode) ? '&at=end' : ''));")
     shell = shell.replace(marca_cv, "cvFrame.src = slideSrc('cv.html')+'#b='+BUILD+'&theme='+theme+'&'+s.cv;")
 
     slug = os.path.basename(deck_dir.rstrip("/"))

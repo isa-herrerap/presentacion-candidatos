@@ -18,6 +18,10 @@
      fetch a propósito, así el deck también funciona abierto con doble clic
      (file://), donde fetch queda bloqueado. -->
 <script src="../data/proceso.js"></script>
+<!-- Modo edición (tesis, motivación, evidencia, motivos de salida). Ver
+     _editable.js: aplica los cambios acumulados sobre PROCESO ANTES de que
+     el render de más abajo lea nada, así que su lógica no cambia en nada. -->
+<script src="_editable.js"></script>
 <!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
 <script src="_nav.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -761,6 +765,9 @@
         return;
       }
       var perfil = cand.perfil;
+      // Prefijo de path para el modo edición (ver _editable.js): todos los
+      // campos editables de esta lámina cuelgan de candidatos.<ci>.perfil.
+      var rutaPerfil = 'candidatos.' + ci + '.perfil.';
 
       document.title = cand.pila + ' — perfil' + (P.meta && P.meta.cargo ? ' · ' + P.meta.cargo : '');
 
@@ -837,7 +844,9 @@
       }
 
       /* -- Rail · tesis (richtext: acepta <b>) -- */
-      q('.tesis-text').innerHTML = perfil.tesis || '';
+      var tesisEl = q('.tesis-text');
+      tesisEl.innerHTML = perfil.tesis || '';
+      if (window.hazEditable) hazEditable(tesisEl, rutaPerfil + 'tesis', { richtext: true });
 
       /* -- Rail · ficha --
          `ubicacion` es la línea propia de la ficha; si el proceso sólo trae
@@ -894,11 +903,13 @@
          vacío o ausente no se dibuja: hay candidatos sin logros declarados y
          una etiqueta huérfana se leería como un dato faltante. */
       var evidencia = perfil.evidencia || {};
-      q('.lead').innerHTML = evidencia.lead || '';
+      var leadEl = q('.lead');
+      leadEl.innerHTML = evidencia.lead || '';
+      if (window.hazEditable) hazEditable(leadEl, rutaPerfil + 'evidencia.lead', { richtext: true });
 
       var GRUPOS_EVID = [
-        { etiqueta: 'Funciones principales', lineas: evidencia.funciones },
-        { etiqueta: 'Logros',                lineas: evidencia.logros },
+        { etiqueta: 'Funciones principales', lineas: evidencia.funciones, campo: 'funciones' },
+        { etiqueta: 'Logros',                lineas: evidencia.logros,    campo: 'logros' },
       ];
       // Tope de tres líneas por grupo: es lo que cabe en la card sin apretar
       // el resto de la lámina.
@@ -925,6 +936,7 @@
           var d = tEvid + SANGRIA_EVID + i * PASO_EVID;
           var linea = el('span','evid-text', txt);
           linea.style.transitionDelay = d.toFixed(2) + 's';
+          if (window.hazEditable) hazEditable(linea, rutaPerfil + 'evidencia.' + g.campo + '.' + i, {});
           col.appendChild(linea);
           if (d > finEvid) finEvid = d;
         });
@@ -961,14 +973,19 @@
          Cuatro salidas como máximo (el tope del stagger). Sin salidas el bloque
          se mantiene y responde "No aplica" — es el candidato de una sola
          empresa, no un dato que falte. */
-      q('.mot-frase').innerHTML = perfil.motivacion || '';
+      var motEl = q('.mot-frase');
+      motEl.innerHTML = perfil.motivacion || '';
+      if (window.hazEditable) hazEditable(motEl, rutaPerfil + 'motivacion', { richtext: true });
       var salidas = (perfil.salidas || []).slice(0, 4);
       var exitsEl = q('.exits');
-      salidas.forEach(function(s){
+      salidas.forEach(function(s, si){
         var p = el('p','exit-row');
         var caso = el('span','exit-caso');
         caso.appendChild(el('span','exit-org', s.org));
-        caso.appendChild(document.createTextNode(' — ' + s.motivo));
+        caso.appendChild(document.createTextNode(' — '));
+        var motivoEl = el('span','exit-motivo', s.motivo);
+        if (window.hazEditable) hazEditable(motivoEl, rutaPerfil + 'salidas.' + si + '.motivo', {});
+        caso.appendChild(motivoEl);
         p.appendChild(caso);
         // `duracion` viene YA ESCRITA en los datos (ver data/proceso.js): la
         // lámina la pinta, no la calcula. Cuando la salida no calza con

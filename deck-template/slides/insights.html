@@ -28,6 +28,10 @@
 <!-- Datos del proceso. Carga síncrona y con ruta relativa: así funciona abriendo
      el archivo directo por file://, sin servidor. -->
 <script src="../data/proceso.js"></script>
+<!-- Modo edición (veredictos, motivos de descarte, insights). Ver
+     _editable.js: aplica los cambios acumulados sobre PROCESO ANTES de que
+     el render de más abajo lea nada, así que su lógica no cambia en nada. -->
+<script src="_editable.js"></script>
 <!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
 <script src="_nav.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -245,19 +249,24 @@
       document.title = 'Insights de la búsqueda — Presentación de candidatos · ' + (meta.cargo || '');
 
       // Sólo los campos con <b> de proceso.js van por innerHTML; el resto, texto.
-      function li(html){
+      // `path`: si viene, el ítem queda editable (ver _editable.js) — todos los
+      // arreglos que pasan por acá son [richtext] según SCHEMA.md.
+      function li(html, path){
         var n = document.createElement('li');
         n.innerHTML = html;
+        if (path && window.hazEditable) hazEditable(n, path, { richtext: true });
         return n;
       }
-      function fill(id, arr, max){
+      function fill(id, arr, max, pathPrefix){
         var ul = document.getElementById(id);
-        (arr || []).slice(0, max).forEach(function(txt){ ul.appendChild(li(txt)); });
+        (arr || []).slice(0, max).forEach(function(txt, i){
+          ul.appendChild(li(txt, pathPrefix ? pathPrefix + '.' + i : null));
+        });
       }
 
       // Veredictos: ok:true → ✓ sólido; ok:false → ✗ de contorno (clase .gap).
       var vWrap = document.getElementById('verdicts');
-      (C.veredictos || []).slice(0, 2).forEach(function(v){
+      (C.veredictos || []).slice(0, 2).forEach(function(v, vi){
         var card = document.createElement('div');
         card.className = 'verdict ' + (v.ok ? 'ok' : 'gap');
 
@@ -275,6 +284,7 @@
         var note = document.createElement('p');
         note.className = 'v-note';
         note.innerHTML = v.nota || '';
+        if (window.hazEditable) hazEditable(note, 'conclusion.veredictos.' + vi + '.nota', { richtext: true });
 
         body.appendChild(label); body.appendChild(state); body.appendChild(note);
         card.appendChild(mark); card.appendChild(body);
@@ -282,10 +292,10 @@
       });
 
       // Columna 1 — máx 5 motivos: más ítems no caben en el alto de la lámina.
-      fill('lista-motivos', C.motivosCaida, 5);
+      fill('lista-motivos', C.motivosCaida, 5, 'conclusion.motivosCaida');
 
       // Columna 2 — insights del mercado.
-      fill('lista-insights', C.insights);
+      fill('lista-insights', C.insights, undefined, 'conclusion.insights');
 
       /* ===== COREOGRAFÍA ===== */
       var STEPS = ['s-veredictos','s-motivos','s-insights'];

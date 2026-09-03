@@ -40,6 +40,26 @@ de selección, a partir de los documentos que ya produces en el proceso: el
 - En la lámina comparativa, haz clic en 2 o 3 candidatos para verlos lado a
   lado (Esc deshace).
 
+## Corregir un texto sin pedírselo a Claude
+
+Los textos largos de la lámina de perfil (tesis, funciones, logros,
+motivación, motivos de salida) y de la de insights (veredictos, motivos de
+descarte, lo que muestra el mercado) se pueden reescribir directo en el deck:
+
+1. Abre `deck.html` con doble clic y pulsa `E`. Aparece un aviso arriba a la
+   izquierda — esos textos ahora se ven con un borde punteado al pasar el
+   mouse: haz clic adentro, borra lo que quieras cambiar y escribe.
+2. Cuando termines, dale al botón **Descargar datos actualizados** del
+   mismo aviso. Se descarga `proceso-editado.js`.
+3. Reemplaza `data/proceso.js` (dentro de la carpeta del deck) por ese
+   archivo descargado — renómbralo a `proceso.js` — y vuelve a abrir
+   `deck.html`. Los cambios ya quedaron adentro, sin modo edición.
+
+Ojo: este archivo nuevo se genera desde cero, así que si el `proceso.js`
+original tenía comentarios `//` explicando algún dato, esos comentarios se
+pierden (el contenido del deck, no). Para cambios estructurales — agregar o
+sacar un candidato, una lámina, una viñeta — eso sí es tarea de Claude.
+
 ## Importante
 
 - El deck de ejemplo que trae la plantilla (Gestor Social Ñuble) es un mockup

@@ -134,6 +134,26 @@
     padding:6px 14px;border-radius:9999px;
     opacity:0;transition:opacity .3s ease}
   #themeToast.show{opacity:.75}
+
+  /* Aviso del MODO EDICIÓN (tecla E, ver _editable.js). A diferencia del
+     toast del tema, éste NO es efímero: se queda mientras el modo siga
+     activo, porque hay un botón adentro (exportar) y porque es la única
+     señal de que las láminas ya están dejando editar texto. */
+  /* Mismo top-center que #themeToast (arriba no colisiona con el kicker/título
+     de ninguna lámina, que siempre parten pegados a la izquierda): ahí es
+     donde este tipo de aviso del shell ya demostró que cabe. */
+  #editBar{left:50%;top:20px;transform:translateX(-50%);z-index:14;
+    display:flex;align-items:center;gap:10px;
+    font-size:clamp(12px,1.3vh,13.5px);font-weight:500;
+    color:var(--deck-ink);background:rgba(253,101,13,.14);
+    border:1px solid rgba(253,101,13,.4);
+    padding:6px 8px 6px 14px;border-radius:9999px;
+    opacity:0;pointer-events:none;transition:opacity .25s ease}
+  #editBar.show{opacity:1;pointer-events:auto}
+  #editBar button{font:inherit;font-weight:600;color:var(--orange);
+    background:var(--deck-bg);border:1px solid rgba(253,101,13,.4);
+    border-radius:9999px;padding:4px 12px;cursor:pointer}
+  #editBar button:hover{background:var(--panel-hover)}
 </style>
 </head>
 <body>
@@ -149,6 +169,10 @@
     <img class="ln" src="assets/logo-horizontal-negativo.svg" alt="">
   </div>
   <div id="themeToast"></div>
+  <div class="chrome" id="editBar">
+    <span id="editCount">Modo edición</span>
+    <button id="editDownload" type="button">Descargar datos actualizados</button>
+  </div>
 
   <!-- Modal del currículum. Vive acá, en el shell, y no dentro de la lámina:
        el porqué está escrito completo en el bloque #cvOverlay del CSS.
@@ -168,6 +192,10 @@
      carga síncrona, sin fetch, así el deck funciona abierto con doble clic
      (file://) igual que servido por HTTP. -->
 <script src="data/proceso.js"></script>
+<!-- Puente del modo edición (ver slides/_editable.js). El shell lo carga
+     también: no para editar nada acá arriba, sino para reusar setPath al
+     armar el archivo que descarga el botón "Descargar datos actualizados". -->
+<script src="slides/_editable.js"></script>
 <script>
 // Sin datos no hay deck. Si data/proceso.js no cargó o tiene un error de
 // sintaxis, el resto de este script reventaría con mensajes de consola que no
@@ -229,7 +257,7 @@ SLIDES.push({file:'comparativa.html', title:'Comparativa de candidatos',    logo
 // proceso de Mandomedio y vive en la propia lámina (ver pasos.html).
 SLIDES.push({file:'pasos.html',       title:'Próximos pasos'});
 // BUILD: súbelo cada vez que edites una diapo (cache-bust del iframe → el navegador recarga el slide nuevo)
-const BUILD = '2026-08-18-1';
+const BUILD = '2026-09-03-1';
 const frame = document.getElementById('frame');
 const wrap = document.getElementById('frameWrap');
 const chromes = document.querySelectorAll('.chrome');
@@ -238,6 +266,50 @@ const overlay = document.getElementById('cvOverlay');
 const cvPanel = document.getElementById('cvPanel');
 const cvFrame = document.getElementById('cvFrame');
 let i = 0;
+
+// ===== Modo edición (tecla E, ver slides/_editable.js) =====
+// `edits` vive en memoria mientras la pestaña siga abierta: el shell nunca se
+// recarga al navegar entre láminas (sólo cambia frame.src), así que no hace
+// falta localStorage para que sobreviva toda la sesión de edición — sólo se
+// pierde si se cierra o recarga deck.html, que es cuando de todos modos ya
+// se tuvo que haber exportado.
+let editMode = false;
+let edits = {};
+const editBar = document.getElementById('editBar');
+const editCount = document.getElementById('editCount');
+
+function actualizarEditBar(){
+  editBar.classList.toggle('show', editMode);
+  const n = Object.keys(edits).length;
+  editCount.textContent = 'Modo edición' + (n ? ' · ' + n + (n === 1 ? ' cambio' : ' cambios') + ' sin exportar' : '');
+}
+
+function toggleEditMode(){
+  editMode = !editMode;
+  actualizarEditBar();
+  // Recarga la lámina actual con el modo (des)activado. En modo edición
+  // siempre se pide `at=end` (ver cargarSlide): sin eso habría que darle a
+  // → varias veces sólo para que aparezcan los campos que se quieren tocar.
+  go(i, true);
+}
+
+document.getElementById('editDownload').onclick = function(){
+  if (!window.DeckEditable) return;
+  const P2 = JSON.parse(JSON.stringify(P));
+  Object.keys(edits).forEach(function(path){ window.DeckEditable.setPath(P2, path, edits[path]); });
+  const src = 'window.PROCESO = ' + JSON.stringify(P2, null, 2) + ';\n';
+  const blob = new Blob([src], { type: 'text/javascript' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  // Nombre A PROPÓSITO distinto de proceso.js: que la descarga nunca se pise
+  // sola con el original, y que reemplazarlo sea un paso consciente de quien
+  // edita, no algo que un doble clic accidental deshaga.
+  a.download = 'proceso-editado.js';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+};
 
 // ===== Tema global (claro / oscuro) =====
 // Orden de precedencia: ?theme= en la URL → lo último elegido → 'dark'.
@@ -307,7 +379,13 @@ function cargar(url){
 
 function cargarSlide(atEnd){
   const s = SLIDES[i];
-  cargar('slides/'+s.file+'?b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+(atEnd ? '&at=end' : ''));
+  // edit=1 le dice a la lámina que vuelva editables sus campos de texto largo
+  // (ver slides/_editable.js); edits= le manda los cambios acumulados en esta
+  // sesión para que los aplique ANTES de pintar, aunque se esté recargando
+  // ella misma. En modo edición se fuerza at=end: se quiere ver todo el
+  // contenido de una vez, no ir revelándolo paso a paso con las flechas.
+  const editsQS = Object.keys(edits).length ? '&edits='+encodeURIComponent(JSON.stringify(edits)) : '';
+  cargar('slides/'+s.file+'?b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+'&edit='+(editMode?1:0)+editsQS+((atEnd||editMode) ? '&at=end' : ''));
 }
 
 function go(n, atEnd){
@@ -448,12 +526,13 @@ window.addEventListener('message', function(e){
   const d = e.data;
   if(!d || !d.deck) return;
   // Los pasos ('step'/'nav') sólo valen si vienen del iframe que manda en este
-  // momento. Los 'cmd' son teclas globales (tema, pantalla completa, cerrar) y
-  // valen venga de donde vengan.
-  if(d.deck !== 'cmd' && fuente(e) !== (cvAbierta ? 'cv' : 'slide')) return;
+  // momento. Los 'cmd' (teclas globales) y 'edit' (un campo que se acaba de
+  // editar) valen venga de donde vengan.
+  if(d.deck !== 'cmd' && d.deck !== 'edit' && fuente(e) !== (cvAbierta ? 'cv' : 'slide')) return;
   if(d.deck === 'step'){ clearTimeout(navTimer); }            // consumió un paso interno
   else if(d.deck === 'nav'){ move(d.dir); }                    // ya no le quedan pasos
   else if(d.deck === 'cmd'){ command(d.key); }                 // tecla global con el foco dentro
+  else if(d.deck === 'edit'){ edits[d.path] = d.value; actualizarEditBar(); }
 });
 
 document.getElementById('next').onclick = next;
@@ -479,6 +558,7 @@ function command(key){
     else document.exitFullscreen();
   }
   else if(key==='t'||key==='T'){ toggleTheme(); }
+  else if(key==='e'||key==='E'){ toggleEditMode(); }
 }
 
 // ↓ y ↑ dejaron de ser sinónimos de → y ←: ahora son el eje del desvío al CV

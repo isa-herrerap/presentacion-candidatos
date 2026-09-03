@@ -28,7 +28,7 @@
   // ↓ y ↑ NO avanzan ni retroceden: son el eje del desvío al currículum, que
   // vive en el shell (abrir/cerrar el CV del candidato). Por eso viajan como
   // comando global y no como paso interno de la lámina.
-  var GLOBALES = ['t', 'T', 'f', 'F', 'Home', 'End', 'ArrowDown', 'ArrowUp'];
+  var GLOBALES = ['t', 'T', 'f', 'F', 'e', 'E', 'Home', 'End', 'ArrowDown', 'ArrowUp'];
 
   function alShell(msg){
     try { parent.postMessage(msg, '*'); } catch (err) {}
@@ -57,6 +57,12 @@
   // shell. Por eso la lámina también escucha por su cuenta, y usa exactamente
   // el mismo camino para que el resultado sea idéntico en los dos casos.
   document.addEventListener('keydown', function(e){
+    // Con el foco DENTRO de un campo en modo edición (ver _editable.js), TODA
+    // tecla es suya, sin excepción: nada de interceptar flechas (mueven el
+    // cursor del texto, no la lámina) ni letras sueltas como 't' o 'e' (son
+    // parte de lo que la persona está escribiendo, no un atajo global).
+    if (e.target && e.target.isContentEditable) return;
+
     // Enter y espacio ACTIVAN el elemento enfocado (las pills de gráfico, los
     // encabezados del comparador). Si el foco está en uno de esos controles,
     // la tecla es suya y no del deck; las flechas, en cambio, siempre navegan.
