@@ -35,16 +35,19 @@ presentacion-candidatos/
 ├── README.md               ← guía de uso para humanos
 ├── deck-template/          ← PLANTILLA MAESTRA (no se edita, ver regla nº1)
 │   ├── deck.html           ← shell: navegación, temas, logo, modal del CV
-│   ├── slides/             ← 8 plantillas de lámina + _nav.js (puente shell↔lámina)
+│   ├── slides/             ← plantillas de lámina + _nav.js (puente shell↔lámina)
+│   │                         y _editable.js (puente del modo edición, ver regla nº10)
 │   ├── data/proceso.js     ← ejemplo canónico (mockup Ñuble, 100% inventado)
 │   ├── data/SCHEMA.md      ← CONTRATO: cada campo, su fuente y sus límites
 │   └── assets/             ← logos oficiales
 ├── casos/1..4/             ← documentos reales de 4 procesos (perfil docx,
 │                             screening xlsx, CVs pdf) — evidencia cruda
-├── decks/                  ← acá nacen los decks generados (uno por proceso).
-│                             Hoy VACÍA: los 4 decks que había quedaron
-│                             desactualizados frente a la plantilla y se
-│                             borraron (2026-08-06). Se regeneran con la skill.
+├── decks/                  ← acá nacen los decks generados (uno por proceso,
+│                             gitignored: son procesos reales de clientes).
+│                             Si uno queda desactualizado frente a la
+│                             plantilla, se sincroniza copiando de vuelta los
+│                             archivos que cambiaron (deck.html, slides/*) —
+│                             SIN tocar su data/proceso.js.
 ├── scripts/extraer_caso.py ← docx/xlsx → texto plano
 └── .claude/                ← skill generar-deck, agente verificador-deck, hook
 ```
@@ -87,6 +90,19 @@ presentacion-candidatos/
    el viewport sin escalado, así que un `clamp(9.5px, 1.3vh, 10.5px)` se dibuja
    a 10,5 px reales hasta en un 4K. El techo es el que deja el texto chico en
    pantalla grande, no el piso.
+10. **Empaqueta el deck en standalone cuando te lo pidan — así, sin más
+    pasos.** Si alguien dice algo como "empaqueta el deck", "hazlo
+    standalone", "prepáralo/déjalo listo para mandar" o "genérame el archivo
+    para la presentación", corre
+    `python3 scripts/empaquetar_standalone.py decks/<slug>` (identifica
+    `<slug>` por el nombre de carpeta en `decks/` o por lo que diga el
+    usuario) y avisa dónde quedó el `.html` resultante. Es un solo comando,
+    no hace falta pedir confirmación de más ni explicar el script — el
+    docstring de `scripts/empaquetar_standalone.py` tiene el detalle si algo
+    falla. Recuérdale al usuario empaquetar AL FINAL, después de revisar y
+    corregir textos (ver más abajo): el standalone es un archivo aparte que
+    no se edita él mismo, así que si corrige algo después hay que volver a
+    empaquetar.
 
 ## Setup (una sola vez por máquina)
 
@@ -106,6 +122,11 @@ comparativa se clickean hasta 3 candidatos para verlos lado a lado (Esc limpia).
 En un perfil, el botón **Ver currículum** abre el CV en una modal encima de la
 lámina; se cierra con la ×, `Esc`, un clic afuera o `↑`, y el perfil sigue donde
 estaba (la flecha `↓` también lo abre, pero ya no se anuncia).
+
+`E` activa el **modo edición**: los textos largos de perfil e insights quedan
+editables directo en el navegador, sin pasar por Claude (detalle completo en
+el README, sección "Corregir un texto sin pedírselo a Claude"). Cuando el
+usuario ya está conforme con el contenido, toca empaquetar — ver regla nº10.
 
 ## Contexto de marca
 

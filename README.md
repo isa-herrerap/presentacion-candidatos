@@ -11,7 +11,7 @@ de selección, a partir de los documentos que ya produces en el proceso: el
   terminal).
 - Google Chrome (para que Claude verifique el deck antes de entregártelo).
 
-## Cómo generar un deck (3 pasos)
+## Cómo generar un deck (4 pasos)
 
 1. **Copia los documentos del proceso** a una subcarpeta de `casos/`
    (ej: `casos/5/`): el perfil .docx o .pdf, el screening .xlsx y los CV .pdf
@@ -29,9 +29,19 @@ de selección, a partir de los documentos que ya produces en el proceso: el
    destaca cada candidato, los veredictos del cierre). Responde y déjalo
    trabajar: al final verifica el deck en el navegador él solo.
 
-3. **Abre el resultado**: `decks/<nombre-del-proceso>/deck.html` — doble clic
-   y listo, no necesita internet ni instalar nada. Esa carpeta es
-   autocontenida: puedes comprimirla y mandarla.
+3. **Abre y revisa el resultado**: `decks/<nombre-del-proceso>/deck.html` —
+   doble clic y listo, no necesita internet ni instalar nada. Recorre todas
+   las láminas; si algún texto no te convence, corrígelo ahí mismo (ver
+   "Corregir un texto sin pedírselo a Claude" más abajo) antes de compartirlo.
+
+4. **Cuando ya estés conforme, empaquétalo para compartir**: dile a Claude
+   algo como *"empaqueta el deck para mandarlo"* o *"hazlo standalone"* — deja
+   un único archivo `decks/<nombre-del-proceso>/<nombre-del-proceso>-standalone.html`
+   con todo adentro (láminas, datos, logos), listo para enviar por correo o
+   Slack y abrir con doble clic en cualquier computador. Empaqueta siempre al
+   final: el standalone es un archivo aparte, no se edita él mismo — si
+   corriges algo después, el cambio va en `data/proceso.js` de la carpeta del
+   deck y se vuelve a empaquetar.
 
 ## Cómo se presenta
 
