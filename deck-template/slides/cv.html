@@ -63,6 +63,7 @@
     --peach:#FFAE7F;                     /* acento de TEXTO */
     --rule:#FFAE7F;                      /* acento de LÍNEA */
     --pill-bg:#313E4B; --pill-ink:#FFFFFF;
+    --sh-tip:0 8px 24px rgba(0,0,0,.30);  /* sombra del tooltip de empresa */
 
     --rail:15%;                          /* ancho de la columna de períodos */
 
@@ -79,6 +80,7 @@
     --hair:#E8EAED;
     --peach:#B34A09; --rule:#FD650D;
     --pill-bg:#F3F5F9; --pill-ink:#1E2D3B;
+    --sh-tip:0 10px 26px rgba(30,45,59,.14);
   }
 
   *{ box-sizing:border-box; margin:0; padding:0; }
@@ -251,6 +253,24 @@
     font-size:var(--e-cargo); line-height:1.25; letter-spacing:-.01em; color:var(--ink); }
   .org{ margin-top:4px; font-family:"Inter",sans-serif; font-weight:500;
     font-size:var(--e-org); line-height:1.4; color:var(--soft); }
+  /* Nombre de empresa con resumen de rubro (dato `queHace`, opcional): el
+     punteado bajo el texto es la única pista de que hay más — no cambia
+     tamaño ni peso, la fila se lee igual sin el dato. */
+  .org-trigger{ cursor:help;
+    text-underline-offset:3px; text-decoration:underline dotted var(--faint); }
+  .org-trigger:hover, .org-trigger:focus-visible{ text-decoration-color:var(--soft); }
+  /* Un solo tooltip reusado para toda la lámina, no uno por fila.
+     position:fixed y ubicado por JS a propósito: .track scrollea
+     (overflow-y:auto vuelve automático también el eje X), así que un
+     position:absolute quedaría recortado por ese contenedor. */
+  .org-tip{ position:fixed; z-index:20; max-width:260px;
+    background:var(--elev); color:var(--body); border:1px solid var(--hair);
+    border-radius:8px; padding:10px 14px; font-family:"Inter",sans-serif;
+    font-weight:400; font-size:clamp(12px,1.5vh,13px); line-height:1.45;
+    box-shadow:var(--sh-tip);
+    opacity:0; transform:translateY(4px); pointer-events:none;
+    transition:opacity .15s var(--eoq), transform .15s var(--eoq); }
+  .org-tip.show{ opacity:1; transform:translateY(0); }
   .bullets{ list-style:none; margin-top:12px;
     display:flex; flex-direction:column; gap:4px; }
   .bullets li{ position:relative; padding-left:12px;
@@ -415,6 +435,49 @@
         return n;
       }
 
+      /* Tooltip de "qué hace la empresa" (dato `trayectoria[].queHace`,
+         opcional). Un solo elemento reusado para toda la lámina, posicionado
+         en JS con getBoundingClientRect: ver por qué en el comentario de
+         `.org-tip` en el CSS. */
+      var tip = el('div', 'org-tip');
+      document.body.appendChild(tip);
+      var tipTrigger = null;
+      function ubicarTip(trigger){
+        var r = trigger.getBoundingClientRect();
+        tip.style.left = '0px'; tip.style.top = '0px';   // reset antes de medir el ancho real
+        var tw = tip.offsetWidth, th = tip.offsetHeight;
+        var left = Math.min(Math.max(8, r.left), window.innerWidth - tw - 8);
+        var top = r.top - th - 10;
+        if (top < 8) top = r.bottom + 10;                // sin espacio arriba: cae abajo
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+      }
+      function mostrarTip(trigger){
+        tipTrigger = trigger;
+        tip.textContent = trigger.dataset.tip;
+        tip.classList.add('show');
+        ubicarTip(trigger);
+      }
+      function ocultarTip(){
+        tipTrigger = null;
+        tip.classList.remove('show');
+      }
+      function activarTip(trigger, texto){
+        trigger.tabIndex = 0;
+        trigger.dataset.tip = texto;
+        trigger.addEventListener('mouseenter', function(){ mostrarTip(trigger); });
+        trigger.addEventListener('mouseleave', ocultarTip);
+        trigger.addEventListener('focus', function(){ mostrarTip(trigger); });
+        trigger.addEventListener('blur', ocultarTip);
+      }
+      // Reubica en vez de esconder al scrollear/cambiar tamaño. Esconder acá
+      // rompía el foco por teclado: al hacer Tab a una fila fuera de vista,
+      // el navegador la scrollea sola dentro de `.track` (comportamiento
+      // nativo de foco), ese scroll disparaba este listener, y el tooltip
+      // que el mismo focus() acababa de mostrar se apagaba en el acto.
+      function reubicarTipActivo(){ if (tipTrigger) ubicarTip(tipTrigger); }
+      window.addEventListener('resize', reubicarTipActivo);
+
       // ---- Render. Corre ANTES de que arranque la coreografía: las clases de
       // entrada tienen que ver el DOM ya completo.
       var cargo = (P.meta && P.meta.cargo) || '';
@@ -488,7 +551,17 @@
 
         var what = el('div', 'what');
         what.appendChild(el('h2', 'cargo', j.cargo));
-        if (j.org) what.appendChild(el('p', 'org', j.org));
+        if (j.org){
+          var orgEl = el('p', 'org');
+          if (j.queHace){
+            var orgTrigger = el('span', 'org-trigger', j.org);
+            orgEl.appendChild(orgTrigger);
+            activarTip(orgTrigger, j.queHace);
+          } else {
+            orgEl.textContent = j.org;
+          }
+          what.appendChild(orgEl);
+        }
         // Sin viñetas no se monta el <ul>: vacío igual sumaría su margen.
         if (j.bullets && j.bullets.length){
           var ul = el('ul', 'bullets');
@@ -515,6 +588,7 @@
         track.style.setProperty('--fade-bot', track.scrollTop < sobra - 2 ? '18px' : '0px');
       }
       track.addEventListener('scroll', pintarBordes);
+      track.addEventListener('scroll', reubicarTipActivo);
       window.addEventListener('resize', pintarBordes);
       requestAnimationFrame(pintarBordes);
       // Sin empleos no se anuncia una sección vacía.

@@ -227,6 +227,20 @@ Campos donde se falla seguido al poblar un candidato:
   y el deck es una foto de su fecha); y un **período sin meses** ("2022 — 2025")
   no se puede calcular exacto, así que va `"aprox. 3 años"` — el "aprox." se
   escribe, no se finge precisión que el CV no da.
+- **`cv.trayectoria[].queHace` va SIEMPRE, en TODA empresa de TODO candidato**
+  (no solo en las que la clienta "probablemente no conoce" — ese criterio es
+  subjetivo y deja huecos). Es una frase MUY corta (6-13 palabras) de a qué se
+  dedica esa empresa; se pinta como tooltip al pasar el mouse sobre su nombre
+  en el CV. Investígala con búsqueda web, usando las pistas que el propio CV ya
+  da (rubro, marcas que menciona, ciudad, bullets de funciones) para confirmar
+  que el resultado encontrado es ESA empresa y no una homónima — típico con
+  agencias o distribuidoras que comparten nombre con otra empresa en otro país.
+  Si la búsqueda no encuentra nada confiable (agencia chica, extranjera,
+  empresa ya cerrada), redacta la frase a partir de lo que el propio CV ya
+  cuenta de ella en sus bullets, en vez de inventar un dato externo sin
+  verificar. Y de paso: si la búsqueda destapa un typo en el nombre de la
+  empresa (`org`), corrígelo — es el mismo criterio que ya aplicas a nombres de
+  personas e instituciones.
 - **Comparativa**: no hay fila de comuna ni de "¿trabajando hoy?". La comuna va
   en el encabezado de la columna (**sólo comuna, sin región**) y la fila "Cargo
   actual" combina `cargoCorto` + el estado del vínculo (`trabajando`) +

@@ -471,6 +471,10 @@ window.PROCESO = {
             cargo: "Encargada de Proyectos",
             periodo: "Mar 2019 — Nov 2020", duracion: "1 año 8 meses",
             org: "World Vision Chile",
+            // Ejemplo de `queHace` (ver SCHEMA.md): aparece como tooltip al pasar
+            // el mouse sobre el nombre de la empresa en el CV. Opcional — sólo
+            // para empresas que la clienta probablemente no conoce.
+            queHace: "ONG internacional de ayuda humanitaria y desarrollo, enfocada en la niñez.",
             bullets: [
               "Gestión y ejecución de proyectos con enfoque territorial.",
               "Coordinación de procesos de capacitación y ejecución programática.",
