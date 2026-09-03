@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil de candidato</title>
+<!-- Híbrido VG + VF: rail izquierdo + FLIP de tarjeta grande de VG,
+     con layout derecho de 3 filas (VF) sin veredicto final. -->
+<!-- PLANTILLA: esta lámina no tiene datos propios. Recibe ?c=<índice> y
+     arma el perfil de PROCESO.candidatos[c] (data/proceso.js). Lo único fijo
+     en el HTML son los rótulos que no cambian de proceso a proceso
+     ("En qué destaca", "Ficha", "Requisitos del cargo", …). -->
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Los datos del proceso entran acá y sólo acá. Carga síncrona y antes de
+     todo: cuando corre el script de abajo, window.PROCESO ya existe. Sin
+     fetch a propósito, así el deck también funciona abierto con doble clic
+     (file://), donde fetch queda bloqueado. -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@300;400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== TEMA =====
+     Literales de marca (fijos en ambos temas) + tokens que cambian.
+
+     TRES tokens de acento, no uno. Sobre claro el brandbook (§2.4 + criterio
+     `badge-semantic-colors`) separa dos usos que antes acá compartían color:
+       --peach   TEXTO naranja → #B34A09, la variante accesible. #FD650D sobre
+                 blanco da 3.1:1 y no alcanza para texto chico.
+       --accent  FILLS Y STROKES (líneas, fondos, dots) → #FD650D, el naranjo
+                 Mandomedio de verdad. Acá no hay problema de contraste porque
+                 no es tinta de lectura.
+       --accent-fuerte  Texto GRANDE (≥18.66 px en negrita), donde #FD650D sí
+                 cumple el umbral de 3:1 de WCAG para texto grande. Es el único
+                 lugar de la lámina donde el naranjo real aparece como palabra.
+     Sobre oscuro los tres colapsan en peach y el tema no cambia en nada. */
+  :root{
+    --navy:#1E2D3B; --orange:#FD650D; --white:#FFFFFF;
+
+    --bg:#1E2D3B; --elev:#313E4B; --peach:#FFAE7F;
+    --accent:#FFAE7F; --accent-fuerte:#FFAE7F;
+    --ink:#FFFFFF;
+    --w80:rgba(255,255,255,.80); --w75:rgba(255,255,255,.75); --w60:rgba(255,255,255,.60);
+    --w55:rgba(255,255,255,.55); --w45:rgba(255,255,255,.45);
+    --hair12:rgba(255,255,255,.12); --hair08:rgba(255,255,255,.08);
+    --gray:#8A96A5;
+    /* Pill de requisito cumplido: sólida sobre navy, tenue sobre blanco. */
+    --pill-bg:#FFAE7F; --pill-br:#FFAE7F; --pill-ink:#1E2D3B;
+    --sh-card:0 18px 40px rgba(0,0,0,.30);
+    --sh-deep:0 20px 44px rgba(0,0,0,.36);
+
+    --ease:cubic-bezier(.22,1,.36,1);
+    --eio:cubic-bezier(.65,0,.35,1);
+    --eoq:cubic-bezier(.23,1,.32,1);
+  }
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --elev:#F3F5F9; --peach:#B34A09;
+    --accent:#FD650D; --accent-fuerte:#FD650D;
+    --ink:#1E2D3B;
+    --w80:#333333; --w75:#4A5563; --w60:#717E8E;
+    --w55:#717E8E; --w45:#A8B0BA;
+    --hair12:#E8EAED; --hair08:#EEF0F3;
+    --gray:#A8B0BA;
+    /* Antes esta pill era #B34A09 sólido con tinta blanca: eso es FAIL contra
+       el criterio `badge-semantic-colors`, que sobre fondo claro pide fondo
+       tenue del color principal + texto en la variante accesible. */
+    --pill-bg:rgba(253,101,13,.11); --pill-br:rgba(253,101,13,.28); --pill-ink:#B34A09;
+    /* Sobre claro la sombra negra fuerte ensucia: se baja mucho la opacidad. */
+    --sh-card:0 10px 26px rgba(30,45,59,.10);
+    --sh-deep:0 12px 30px rgba(30,45,59,.13);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:var(--bg); }
+  body{ font-family:"Inter",sans-serif; color:var(--ink); -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  .slide{ position:relative; width:100vw; height:100vh; background:var(--bg); overflow:hidden; }
+
+  .hair-div{ position:absolute; left:32%; top:0; width:1px; height:100%;
+    background:var(--hair12); opacity:0; transition:opacity .6s var(--ease); }
+  .s-ficha .hair-div{ opacity:.55; }
+
+  /* ===== RAIL IZQUIERDO 32% ===== */
+  /* El padding-bottom reserva la banda del logo del pie (absoluto sobre la
+     lámina): sin él, la última línea de Formación queda debajo del lockup.
+
+     Las SEIS secciones (identidad, ficha, formación, cargo/empresa, tesis,
+     botón CV) son hijos DIRECTOS de `.rail` — ya no hay wrappers `.rail-top`/
+     `.rail-foot`. `justify-content:space-between` reparte todo el alto
+     disponible del riel EN PARTES IGUALES entre ellas: la primera queda
+     pegada arriba, la última (el botón del CV) pegada abajo, y el resto se
+     separa con el mismo espacio, que crece o se achica solo según cuánto
+     texto traiga el candidato. `gap` es el piso: si algún día el contenido es
+     tan largo que casi no sobra aire, igual queda ese mínimo entre secciones
+     en vez de que se toquen. */
+  .rail{ position:absolute; top:0; left:0; width:32%; height:100%;
+    display:flex; flex-direction:column; justify-content:space-between;
+    gap:clamp(14px,2vh,20px);
+    padding:clamp(30px,5vh,56px) clamp(24px,2.6vw,40px);
+    padding-bottom:clamp(58px,9.5vh,82px); }
+
+  .name-flip{ width:fit-content; transform-origin:top left;
+    transition:transform .85s var(--eio); }
+  .hero .name-flip{ transform:var(--hero-transform, translate(0,0) scale(2.5)); }
+  .name{ font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(28px,4.8vh,42px); line-height:1.04; letter-spacing:-.02em; color:var(--ink);
+    opacity:0; transition:opacity 1.1s var(--ease); }
+  .play .name{ opacity:1; }
+
+  /* ===== FOTO DEL CANDIDATO =====
+     Va a la derecha de la identidad, pegada al borde derecho del rail y
+     CENTRADA contra el bloque de texto completo (nombre + organización +
+     cargo + estado), no contra la primera línea: alineada al tope se veía
+     flotando alto respecto de la columna. De ahí que `.ident-txt` envuelva
+     al nombre Y al titular — el `align-items:center` centra el círculo
+     contra los dos juntos, y la fila siempre mide lo que mida el más alto.
+     El reparto de ancho: el círculo toma su ancho y la columna de texto se
+     queda con el resto (`flex:1 1 0`). El nombre no se achica por el
+     círculo; si un apellido muy largo no cabe, el .name simplemente quiebra
+     una línea más y el círculo se recentra solo contra el bloque más alto. */
+  .ident-head{ display:flex; align-items:center; justify-content:space-between;
+    gap:clamp(12px,1.2vw,20px); }
+  .ident-txt{ flex:1 1 0; min-width:0; }
+  /* El círculo se dibuja SIEMPRE, haya foto o no. Es un espacio RESERVADO de
+     la composición: si desapareciera cuando falta la foto, el nombre se
+     correría hacia la derecha y cada candidato armaría una lámina distinta.
+     `border-radius:50%` es lo que manda el brandbook para avatares, y el
+     `overflow:hidden` + `object-fit:cover` de la imagen evitan que una foto
+     vertical u horizontal salga deformada. */
+  /* El techo del ancho (124px) es hasta donde se puede crecer sin apretar el
+     nombre: el círculo le come ancho a la columna de texto, y pasado ese
+     punto los apellidos largos empiezan a quebrar una línea de más. */
+  .foto{ flex:0 0 auto; width:clamp(76px,12vh,124px); aspect-ratio:1/1;
+    border-radius:50%; overflow:hidden;
+    background:var(--elev); border:1px solid var(--hair12);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; transform:scale(.94);
+    transition:opacity .6s var(--ease), transform .6s var(--ease); }
+  /* Entra con el primer paso (s-ficha, hoy el que abre la coreografía), no al
+     final de la lámina: en el hero el nombre está al centro de la pantalla y
+     un círculo solo en la esquina se leería como un error de carga. */
+  .s-ficha .foto{ opacity:1; transform:none; transition-delay:.18s; }
+  .foto-img{ width:100%; height:100%; object-fit:cover; display:block; }
+  /* Placeholder mientras no haya fotos del proceso: iniciales sobre la
+     superficie gris de marca (--elev = #F3F5F9 en claro, #313E4B en oscuro).
+     Nada de silueta, gradiente ni glow — §6.7 anti-slop del brandbook.
+     Las iniciales van en --w75 (el secundario del archivo, el mismo de las
+     etiquetas de bloque) y no en --w60: sobre #F3F5F9 el --w60 queda en
+     3.7:1 y a 18 px eso no alcanza.
+     El tamaño va atado al del círculo (~35% del diámetro en cualquier
+     pantalla): si se queda fijo, al agrandar el círculo las iniciales
+     quedan nadando en el medio. */
+  .foto-ini{ font-family:"Inter",sans-serif; font-weight:500;
+    font-size:clamp(26px,4.4vh,44px); line-height:1; letter-spacing:.5px;
+    color:var(--w75); user-select:none; }
+
+  /* Bloque "Cargo actual y empresa" / "Último cargo y empresa": el rótulo
+     (reusa `.blk-label`, el mismo look de "Ficha"/"Formación") dice cuál de
+     las dos es, según `trabajando` — por eso ya no hace falta el marcador
+     `.estado` inline que había antes pegado al cargo: la distinción vive
+     ahora en el título del bloque, no repetida dos veces. Debajo, la empresa
+     como kicker Dongra (italic peach) y el cargo en blanco. */
+  .titular-block{ max-width:34ch;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .6s var(--ease), transform .6s var(--ease); }
+  .s-titular .titular-block{ opacity:.9; transform:none; transition-delay:.28s; }
+  .titular-block .blk-label{ margin-bottom:7px; }
+  .titular-org{ font-family:"Dongra","Georgia","Times New Roman",serif; font-style:italic;
+    font-weight:400; font-size:clamp(15px,2.1vh,19px); line-height:1.25; color:var(--peach);
+    margin-bottom:4px; }
+  .titular{ font-family:"Red Hat Display",sans-serif; font-weight:600;
+    font-size:clamp(14px,1.95vh,17px); line-height:1.38; color:var(--ink); }
+  /* Desde cuándo está en el cargo. Dato de APOYO —igual que la duración de las
+     salidas—, así que va un escalón más abajo en tamaño y en tinta: dice hace
+     cuánto sostiene el rol sin competirle al cargo mismo. Debajo y no al lado
+     porque el rail es angosto (34ch) y en la misma línea empujaría el cargo a
+     partirse en dos. */
+  .titular-desde{ margin-top:3px;
+    font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(12.5px,1.7vh,14.5px); line-height:1.3; color:var(--w55); }
+
+  /* El bloque de la tesis vive SIEMPRE con el ancho del rail: el paso a
+     center-stage es puro transform (translate+scale), que no reflowea. Nada
+     que altere el ancho del texto puede animarse acá — un letter-spacing en
+     transición re-quiebra las líneas y se ve como un bug. */
+  .tesis-flip{ display:block; width:100%;
+    transform-origin:top left;
+    transform:var(--tesis-transform, none); opacity:0;
+    transition:opacity .9s var(--ease), transform .7s var(--eio);
+    will-change:transform; backface-visibility:hidden; }
+  .s-tesis .tesis-flip{ opacity:1; }
+  .s-park .tesis-flip{ transform:none; }        /* el viaje al rail: paso propio */
+  .tesis-kicker{ font-family:"Dongra","Georgia","Times New Roman",serif; font-style:italic; font-weight:400;
+    font-size:clamp(15px,2.1vh,19px); color:var(--peach); margin-bottom:clamp(6px,1vh,10px);
+    opacity:0; transition:opacity .4s var(--ease); }
+  .s-tesis .tesis-kicker{ opacity:1; }
+  .tesis-text{ font-family:"Red Hat Display",sans-serif; font-weight:700;
+    font-size:clamp(20px,3vh,22px); line-height:1.28; color:var(--ink);
+    letter-spacing:0; }
+  /* La tesis es EL argumento de la lámina: es lo único que se lleva el naranjo
+     Mandomedio como palabra. Puede hacerlo porque va en 20-22 px negrita, por
+     encima del umbral de "texto grande" donde #FD650D cumple contraste. */
+  .tesis-text b{ font-weight:800; color:var(--accent-fuerte); }
+
+  /* Sin líneas divisorias entre secciones: el espaciado entre ellas lo da
+     `justify-content:space-between` en `.rail` (ver más arriba), no un
+     margin propio de cada bloque. */
+  .fic{ opacity:0; transform:translateX(-8px);
+    transition:opacity .4s var(--ease), transform .4s var(--ease); }
+  .s-ficha .fic{ opacity:1; transform:none; }
+  .s-ficha .fic1{ transition-delay:.05s; } .s-ficha .fic2{ transition-delay:.17s; }
+  .s-ficha .fic3{ transition-delay:.29s; } .s-ficha .fic4{ transition-delay:.41s; }
+  .s-ficha .fic5{ transition-delay:.53s; } .s-ficha .fic6{ transition-delay:.65s; }
+  /* PISO TIPOGRÁFICO (política del deck): ningún texto visible baja de 12 px
+     y el TECHO de cada clamp sube en la misma proporción que el piso. El
+     techo era el verdadero culpable: la lámina ocupa el viewport entero sin
+     escalado, así que un `clamp(10px,1.4vh,11px)` se dibujaba a 11 px reales
+     por grande que fuera la pantalla — el vh nunca llegaba a mandar.
+     El pie del rail (FICHA + FORMACIÓN) va un escalón por sobre ese piso:
+     con el resto de la lámina ya subida se veía chico al lado. Sube entero
+     y en bloque, manteniendo el orden interno de tamaños — estudio > ficha >
+     rótulo ≈ razón social > marca de validación — para que siga leyéndose
+     como pie y no como protagonista. */
+  .blk-label{ font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(13px,1.8vh,15px);
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--w75); }
+  .ident-ficha{ margin-top:7px; font-family:"Inter",sans-serif; font-weight:400;
+    font-size:clamp(14px,1.95vh,16.5px); line-height:1.5; color:var(--w75); }
+
+  /* Formación como bloque aparte: una fila por estudio (título + institución)
+     con su marcador de validación al costado. Admite pregrado, magíster y
+     diplomados sin cambiar la estructura. */
+  .estudios{ list-style:none; margin-top:7px;
+    display:flex; flex-direction:column; gap:clamp(6px,1vh,9px); }
+  .estudio{ display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px; }
+  .estudio-txt{ font-family:"Red Hat Display",sans-serif; font-weight:600;
+    font-size:clamp(14.5px,2vh,17px); line-height:1.32; color:var(--ink); }
+  .estudio-txt .inst{ font-weight:400; color:var(--w75); }
+  /* Este era el peor caso de la lámina: 9 px FIJOS, o sea 9 px reales en
+     cualquier pantalla. Pasa a clamp con piso 12. */
+  .val{ flex:none; font-family:"Inter",sans-serif; font-weight:500;
+    font-size:clamp(12px,1.65vh,14px);
+    text-transform:uppercase; letter-spacing:1px; color:var(--w45); white-space:nowrap; }
+  .val.ok{ color:var(--peach); }
+
+  /* ===== BOTÓN DEL CURRÍCULUM =====
+     Va al final del riel, justo bajo la tesis: ahí se encuentra solo (es lo
+     último de la columna, sobre la banda del logo) y aterriza junto con ella,
+     que es cuando la clienta ya escuchó el argumento completo del candidato —
+     buen momento para ofrecer "si quieres el detalle, acá está el CV".
+     Deliberadamente SIN cromo: es un botón de TEXTO en el registro secundario
+     de la lámina — mismo Inter 500 en versalita que los rótulos FICHA y
+     FORMACIÓN —, no un CTA naranja. Lo único que lo delata como control es la
+     línea fina de abajo, que al pasar el mouse se tiñe de acento.
+     Entra con la tesis ya parqueada (paso `s-park`), no antes: aparecer junto
+     a Ficha, arriba, mientras la tesis todavía no bajó al riel, lo dejaría
+     colgando solo al fondo de una columna vacía. El atajo ↓ sigue funcionando
+     en cualquier paso, así que no se pierde nada.
+     `visibility` además del `opacity`: un botón invisible pero enfocable es una
+     trampa para quien navega con Tab. */
+  /* `vertical-align:top` porque es inline-level: sin eso el hueco del
+     descendente de la línea le suma unos píxeles muertos abajo.
+     `align-self:flex-start`: es hijo directo de `.rail` (que reparte sus
+     hijos con `justify-content:space-between`, y por defecto los estira a lo
+     ancho); sin esto el botón se estiraría al 100% del riel en vez de medir
+     lo que mide su propio texto. */
+  .cv-link{ align-self:flex-start; vertical-align:top;
+    display:inline-flex; align-items:center; gap:8px;
+    background:none; border:0; border-bottom:1px solid var(--hair12);
+    padding:0 0 4px; cursor:pointer;
+    font-family:"Inter",sans-serif; font-weight:500;
+    font-size:clamp(12px,1.7vh,14px); line-height:1.3;
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--w75);
+    opacity:0; transform:translateX(-8px); visibility:hidden;
+    transition:opacity .4s var(--ease), transform .4s var(--ease),
+               color .25s var(--ease), border-color .25s var(--ease); }
+  .s-park .cv-link{ opacity:1; transform:none; visibility:visible; transition-delay:.3s; }
+  .cv-link:hover{ color:var(--ink); border-bottom-color:var(--accent); }
+  .cv-link:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; }
+  .cv-arrow{ transition:transform .25s var(--ease); }
+  .cv-link:hover .cv-arrow{ transform:translateX(3px); }
+
+  /* Mientras la tesis manda al centro, el rail se atenúa; recupera cuando la
+     tesis aterriza (s-park), no cuando entra la ficha. */
+  .s-tesis .name-flip, .s-tesis .foto, .s-tesis .titular-block{ opacity:.55; }
+  .s-park .name-flip, .s-park .foto{ opacity:1; }
+  .s-park .titular-block{ opacity:.9; }
+
+  /* ===== ZONA DERECHA 68% — 3 filas (layout VF) ===== */
+  .stage-zone{ position:absolute; top:0; right:0; width:68%; height:100%;
+    display:flex; flex-direction:column; gap:clamp(12px,2vh,16px);
+    padding:clamp(30px,5vh,56px) clamp(44px,4vw,60px) clamp(24px,4vh,40px) clamp(24px,2.4vw,36px);
+    overflow:hidden; }
+
+  /* Card genérica: emersión (background + borde + sombra fade in, translateY). */
+  .card{ background:transparent; border:1px solid transparent;
+    border-radius:20px; padding:clamp(16px,2.2vh,22px) clamp(18px,2.2vw,28px);
+    box-shadow:0 6px 16px rgba(0,0,0,0);
+    transform:translateY(10px); min-height:0; overflow:hidden;
+    transition:background-color .7s ease-in-out, border-color .7s ease-in-out,
+               box-shadow .7s ease-in-out, transform .7s var(--ease); }
+  .cbody{ height:100%; display:flex; flex-direction:column; justify-content:center;
+    transition:opacity .5s var(--ease); }
+
+  /* Reparto de las tres filas. Al subir el piso tipográfico la banda de
+     requisitos quedó al borde: con las pills en 13 px caben en una fila,
+     pero si el proceso trae requisitos más largos se parten en dos y antes
+     no había alto para la segunda. La banda pasa de 14 a 15 y el punto sale
+     del dúo de abajo (32 → 31), que es el bloque con más aire sobrante.
+     La evidencia NO se toca: es la fila que va más justa de contenido. */
+  .evid-card{ flex:40 1 0; min-height:0; }
+  .check-band{ flex:15 1 0; min-height:0; display:flex; flex-direction:column; justify-content:center; }
+  .duo{ flex:31 1 0; min-height:0; display:flex; gap:clamp(12px,1.5vw,16px); }
+  .moveria{ flex:1.25 1 0; min-height:0; }
+  .economia{ flex:1 1 0; min-height:0; }
+  /* La fila de abajo es la más densa: se aprieta el padding vertical para
+     recuperar ~16px sin tocar el contenido. */
+  .duo .card{ padding-top:clamp(12px,1.7vh,16px); padding-bottom:clamp(12px,1.7vh,16px); }
+  /* La banda de requisitos es la ÚNICA "card" que nunca se pinta: no hay
+     ninguna regla `.s-check .check-band` que le dé fondo, borde ni sombra,
+     así que su padding vertical es aire y no la caja de una tarjeta. Se
+     aprieta para que las pills quepan aunque se partan en dos filas en
+     pantallas bajas (1280×720), sin robarle alto ni a la evidencia ni al
+     dúo. El padding LATERAL se mantiene: es el que alinea las pills con el
+     texto de las otras tarjetas. */
+  .check-band{ padding-top:clamp(8px,1.2vh,14px); padding-bottom:clamp(8px,1.2vh,14px); }
+
+  .s-evid .evid-card{ background-color:var(--elev); border-color:var(--hair12);
+    box-shadow:var(--sh-card); transform:none; }
+  .s-moveria .moveria{ background-color:var(--elev); border-color:var(--hair12);
+    box-shadow:var(--sh-card); transform:none; }
+  .s-economia .economia{ background-color:var(--elev); border-color:var(--hair12);
+    box-shadow:var(--sh-deep); transform:none; }
+
+  /* ===== Contenido GRANDE de cada capítulo ===== */
+  .k-kicker{ font-family:"Dongra","Georgia","Times New Roman",serif; font-style:italic; font-weight:400;
+    font-size:clamp(16px,2.2vh,20px); color:var(--peach); margin-bottom:clamp(8px,1.4vh,14px);
+    opacity:0; transition:opacity .4s var(--ease); }
+  .lead{ font-family:"Red Hat Display",sans-serif; font-weight:600;
+    font-size:clamp(17px,2.7vh,24px); line-height:1.3; color:var(--ink); max-width:44ch;
+    opacity:0; transition:opacity .4s var(--ease); }
+  /* El destacado del lead va en `--accent-fuerte`, el MISMO token que usa el
+     destacado de la tesis: los dos argumentos de la lámina tienen que hablar
+     el mismo naranjo. Antes iba en `--peach`, que sobre claro es #B34A09, y
+     quedaban dos naranjos distintos compitiendo en la misma pantalla.
+     EXCEPCIÓN CONSCIENTE, no un descuido — que quede escrito con la cifra:
+     el brandbook pide #B34A09 para texto naranja sobre claro por contraste.
+     Este <b> es Red Hat Display 700 a 24 px, o sea TEXTO GRANDE, donde el
+     umbral WCAG baja de 4.5:1 a 3:1 — pero sobre la superficie de la card
+     (#F3F5F9) el #FD650D da 2,73:1, así que igual queda bajo el umbral.
+     Es una decisión de marca de Vicente, tomada sabiendo el número, para una
+     pieza que se proyecta en grande. No lo "corrijas" de vuelta a --peach.
+     Sobre oscuro no hay dilema: ahí --accent-fuerte ya colapsa en peach. */
+  .lead b{ font-weight:700; color:var(--accent-fuerte); }
+  /* Cada <li> es un GRUPO ("Funciones principales" / "Logros"): la etiqueta a
+     la izquierda, y a su derecha la columna con UNA O MÁS líneas. El gap entre
+     líneas de un mismo grupo es menor que el gap entre grupos: eso es todo lo
+     que hace falta para que se lean como bloques. */
+  .evid{ list-style:none; margin-top:clamp(10px,1.8vh,16px);
+    display:flex; flex-direction:column; gap:clamp(6px,1.2vh,12px); }
+  .evid li{ display:flex; gap:clamp(12px,1.2vw,16px); align-items:baseline; }
+  .evid-lineas{ display:flex; flex-direction:column; gap:clamp(4px,.8vh,8px); min-width:0; }
+  /* Las etiquetas son ROTULACIÓN, no argumento. Iban en acento y eran manchas
+     naranjas compitiendo con el lead que tienen al lado — la principal causa de
+     que la lámina completa se viera monótona. Van neutras: la jerarquía la hace
+     el lead, no la etiqueta.
+     El ancho de la columna tiene que aguantar "PRINCIPALES" en una línea, que
+     es la palabra más larga de las dos etiquetas fijas. Y el `baseline` del
+     <li> es a propósito: deja el rótulo pegado a la PRIMERA línea de su grupo,
+     no centrado en el bloque — así se lee de arriba hacia abajo. */
+  .eje{ flex:0 0 clamp(100px,8.5vw,120px); font-family:"Inter",sans-serif; font-weight:600;
+    font-size:clamp(12px,1.55vh,13.5px); line-height:1.25;
+    text-transform:uppercase; letter-spacing:.8px;
+    color:var(--w60); opacity:0; transition:opacity .3s var(--ease); }
+  .evid-text{ font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(14px,2vh,19px); line-height:1.36; color:var(--w80);
+    opacity:0; transform:translateX(12px);
+    transition:opacity .55s var(--ease), transform .55s var(--ease); }
+  .k-label{ font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(12px,1.7vh,14px);
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--w75); margin-bottom:clamp(8px,1.4vh,14px);
+    opacity:0; transition:opacity .4s var(--ease); }
+  .pills{ display:flex; flex-wrap:wrap; gap:clamp(8px,1vh,10px); }
+  /* Las pills suben el PISO (11 → 12) pero mantienen el techo en 13 Y la
+     rampa original en 1.6vh: las cinco de este proceso caben en UNA fila
+     justo justo (812 de 829 px a 1440×900), así que cualquier milímetro de
+     más las parte en dos. Con 1.75vh se rompía a 1366×768, que es donde la
+     banda tiene menos alto. */
+  .pill{ display:inline-flex; align-items:center; gap:4px; border-radius:9999px;
+    padding:4px 12px; font-family:"Inter",sans-serif; font-weight:600;
+    font-size:clamp(12px,1.6vh,13px); line-height:1.3;
+    background:var(--pill-bg); border:1px solid var(--pill-br); color:var(--pill-ink);
+    opacity:0; transform:scale(.92); transition:opacity .5s var(--eoq), transform .5s var(--eoq); }
+  .pill .tick{ color:var(--pill-ink); font-weight:600; }
+  /* La lista de requisitos es FIJA para todo el deck (PROCESO.requisitosCargo):
+     todas las candidatas muestran las mismas pills, en el mismo orden. Lo que
+     cambia por candidata es cuáles están "pintadas" (cumple, `.pill`) y
+     cuáles no (`.pill--off`). Antes cada candidata listaba sólo un subconjunto
+     propio de requisitos — eso hacía imposible comparar de un vistazo entre
+     perfiles, porque las etiquetas ni siquiera calzaban entre columnas.
+     `.pill--off` tiene que leerse claramente COMO AUSENCIA, no como "cumple
+     pero sin verificar" (ese matiz ya no existe acá): opacidad baja, sin
+     relleno, sin ✓. */
+  .pill--off{ background:transparent; border:1px solid var(--hair12); color:var(--w45);
+    font-weight:500; }
+
+  /* Motivación (por qué quiere ESTE cargo) arriba; separador; motivos de
+     salida (por qué dejó los anteriores) abajo. Son dos preguntas distintas
+     y la clienta las lee distinto. */
+  .mot-frase{ font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(14px,1.95vh,16px); line-height:1.4; color:var(--w80);
+    opacity:0; transform:translateY(8px);
+    transition:opacity .5s var(--ease), transform .5s var(--ease); }
+  /* Motivación es contexto, no argumento: su destacado se hace con peso, no con
+     color. En 13 px el naranjo además es el caso de peor contraste de la lámina. */
+  .mot-frase b{ font-weight:600; color:var(--ink); }
+  .mv-divider{ height:1px; background:var(--hair08); border:0;
+    margin:clamp(9px,1.5vh,14px) 0 clamp(8px,1.3vh,12px);
+    opacity:0; transition:opacity .4s var(--ease); }
+  .mv-label{ font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(12px,1.6vh,13.5px);
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--w75);
+    margin-bottom:clamp(5px,.9vh,8px);
+    opacity:0; transition:opacity .4s var(--ease); }
+  .exits{ display:flex; flex-direction:column; gap:clamp(3px,.6vh,6px); }
+  /* Misma composición que las filas de Formación del rail: el caso a la
+     izquierda y su metadato pegado al margen derecho, alineados por baseline. */
+  .exit-row{ display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(13.5px,1.85vh,15.5px); line-height:1.36; color:var(--w80);
+    opacity:0; transform:translateY(8px); transition:opacity .5s var(--ease), transform .5s var(--ease); }
+  .exit-row .exit-org{ font-weight:600; color:var(--ink); }
+  /* Candidato de una sola empresa: no hay salida que explicar y el bloque dice
+     "No aplica" en vez de desaparecer. Que el rótulo esté y la fila responda es
+     información — desaparecido, el cliente no sabe si es que no cambió nunca de
+     trabajo o si a Mandomedio le faltó averiguarlo. */
+  .exit-row.exit-na{ color:var(--w45); }
+  .exit-caso{ min-width:0; }
+  /* Cuánto duró en ese cargo: dato de APOYO, no titular. Va en el registro
+     secundario de la sección (Inter, color tenue) para que no compita con el
+     motivo, y con cifras tabulares para que los números cuadren entre filas.
+     `nowrap` para que "1 año 8 meses" no se parta en dos. */
+  .exit-dur{ flex:none; font-family:"Inter",sans-serif; font-weight:400;
+    font-size:clamp(12px,1.6vh,13.5px); line-height:1.36; color:var(--w60);
+    font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+  /* Cara a cara: actual arriba, pretensión abajo, separadas por la línea peach
+     que se dibuja. Cifra completa en pesos (nunca abreviada) → `nowrap` para
+     que $1.550.000 no se parta nunca. */
+  .econ{ display:flex; flex-direction:column; }
+  .econ-ctx{ font-family:"Inter",sans-serif; font-weight:400; font-size:clamp(13px,1.75vh,15px);
+    line-height:1.3; color:var(--w60); letter-spacing:.4px;
+    opacity:0; transition:opacity .4s var(--ease); }
+  .econ-fig{ font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(24px,5.2vh,42px); line-height:1.08; letter-spacing:-.02em; color:var(--ink);
+    white-space:nowrap;
+    opacity:0; transition:opacity .5s var(--ease), transform .6s var(--ease); }
+  .econ-now{ margin-top:2px; }
+  /* Trazo gráfico, no texto: acá va el naranjo Mandomedio puro (§6.3 del spec,
+     "fills, strokes, dots de estado"), y queda bajo la cifra de renta, que es
+     de lo primero que busca el cliente. */
+  .econ-rule{ height:2px; background:var(--accent); margin:clamp(10px,1.7vh,16px) 0 clamp(8px,1.4vh,13px);
+    transform:scaleX(0); transform-origin:left; transition:transform .6s var(--ease); }
+  .econ-want{ margin-top:2px; transform:translateY(10px); }
+
+  /* Sin renta actual: NO es un dato que falta, es que el proceso decidió no
+     mostrarla (ver data/SCHEMA.md, campo `rentaActual`). Si acá quedara la
+     fila "Renta líquida actual" con una raya, el cliente lee un hueco donde
+     cree que debería haber un número — exactamente lo que hay que evitar. Se
+     saca la fila entera y la pretensión pasa a ser lo único de la tarjeta,
+     agrandada para ocupar el mismo espacio que antes ocupaban las dos. */
+  .econ--solo .econ-now-ctx, .econ--solo .econ-now, .econ--solo .econ-rule{ display:none; }
+  .econ--solo .econ-want-ctx{ font-size:clamp(14px,1.9vh,16px); }
+  .econ--solo .econ-want{ font-size:clamp(30px,6.4vh,52px); margin-top:6px; }
+
+  /* ===== Coreografía por paso =====
+     OJO: los selectores van SIEMPRE scopeados a su capítulo (.chap-*). El
+     kicker es una clase compartida entre evidencia y movería: un
+     `.s-evid .k-kicker` suelto enciende también el de la card de abajo y se
+     ve un título flotando sobre el navy antes de que su tarjeta exista. */
+  .s-evid .chap-evid{ opacity:1; }
+  .s-evid .chap-evid .k-kicker{ opacity:1; transition-delay:.5s; }
+  .s-evid .chap-evid .lead{ opacity:1; transition-delay:.85s; }
+  /* Acá el CSS sólo ENCIENDE; el `transition-delay` de cada etiqueta y de cada
+     línea lo escribe el script. Antes eran tres ítems fijos y el escalonado
+     cabía en reglas nth-child; ahora el número de líneas por grupo es variable
+     y no hay forma de expresarlo en CSS sin repetir el cálculo. */
+  .s-evid .chap-evid .eje{ opacity:1; }
+  .s-evid .chap-evid .evid-text{ opacity:1; transform:none; }
+
+  /* El stagger de las pills llega hasta la octava (+.14s cada una): ese es el
+     tope que renderiza el script, porque una pill sin delay propio nunca se
+     encendería. */
+  .s-check .chap-check .k-label{ opacity:1; transition-delay:.05s; }
+  .s-check .chap-check .pill:nth-child(1){ opacity:1; transform:none; transition-delay:.15s; }
+  .s-check .chap-check .pill:nth-child(2){ opacity:1; transform:none; transition-delay:.29s; }
+  .s-check .chap-check .pill:nth-child(3){ opacity:1; transform:none; transition-delay:.43s; }
+  .s-check .chap-check .pill:nth-child(4){ opacity:1; transform:none; transition-delay:.57s; }
+  .s-check .chap-check .pill:nth-child(5){ opacity:1; transform:none; transition-delay:.71s; }
+  .s-check .chap-check .pill:nth-child(6){ opacity:1; transform:none; transition-delay:.85s; }
+  .s-check .chap-check .pill:nth-child(7){ opacity:1; transform:none; transition-delay:.99s; }
+  .s-check .chap-check .pill:nth-child(8){ opacity:1; transform:none; transition-delay:1.13s; }
+
+  /* Los exit-row van indexados por nth-child dentro de .exits, NO por
+     nth-of-type entre los <p> de la card: agregar un párrafo arriba corría
+     todo el stagger. Hay delay para cuatro motivos de salida — el mismo tope
+     que corta el script. */
+  .s-moveria .chap-moveria .k-kicker{ opacity:1; transition-delay:.5s; }
+  .s-moveria .chap-moveria .mot-frase{ opacity:1; transform:none; transition-delay:.75s; }
+  .s-moveria .chap-moveria .mv-divider{ opacity:1; transition-delay:1.05s; }
+  .s-moveria .chap-moveria .mv-label{ opacity:1; transition-delay:1.2s; }
+  .s-moveria .chap-moveria .exits .exit-row{ opacity:1; transform:none; }
+  .s-moveria .chap-moveria .exits .exit-row:nth-child(1){ transition-delay:1.4s; }
+  .s-moveria .chap-moveria .exits .exit-row:nth-child(2){ transition-delay:1.6s; }
+  .s-moveria .chap-moveria .exits .exit-row:nth-child(3){ transition-delay:1.8s; }
+  .s-moveria .chap-moveria .exits .exit-row:nth-child(4){ transition-delay:2s; }
+
+  /* Cuatro tiempos: contexto → cifra actual → se dibuja la línea → pretensión. */
+  .s-economia .chap-econ .econ-now-ctx{ opacity:1; transition-delay:.55s; }
+  .s-economia .chap-econ .econ-now{ opacity:1; transition-delay:.7s; }
+  .s-economia .chap-econ .econ-rule{ transform:scaleX(1); transition-delay:1.15s; }
+  .s-economia .chap-econ .econ-want-ctx{ opacity:1; transition-delay:1.6s; }
+  .s-economia .chap-econ .econ-want{ opacity:1; transform:none; transition-delay:1.75s; }
+  /* Solo pretensión: sin fila "actual" que esperar, entra en el primer tiempo
+     (misma pareja de delays que usaba el contexto+cifra de la renta actual). */
+  .s-economia .chap-econ .econ--solo .econ-want-ctx{ transition-delay:.55s; }
+  .s-economia .chap-econ .econ--solo .econ-want{ transition-delay:.7s; }
+
+  .footlogo{ position:absolute; left:clamp(24px,2.6vw,40px); bottom:clamp(10px,1.8vh,18px);
+    opacity:0; transition:opacity .7s var(--ease); transition-delay:.9s; z-index:5; }
+  .play .footlogo{ opacity:1; }
+  .footlogo img{ height:30px; width:auto; display:block; opacity:.85; }
+
+  /* Aviso de datos: si data/proceso.js no cargó o el candidato pedido no trae
+     perfil, la lámina no se puede armar. Se reemplaza todo por este mensaje en
+     castellano simple, porque quien edita los datos no es técnica. */
+  .fallo{ height:100%; display:flex; flex-direction:column; justify-content:center;
+    gap:8px; padding:0 clamp(30px,6vw,100px); background:var(--bg); }
+  .fallo-t{ font-family:"Red Hat Display",sans-serif; font-weight:700;
+    font-size:clamp(20px,3.4vh,28px); line-height:1.2; color:var(--ink); }
+  .fallo-d{ font-family:"Inter",sans-serif; font-weight:400;
+    font-size:clamp(13px,1.9vh,15px); line-height:1.5; color:var(--w75); max-width:52ch; }
+
+  .no-anim *, .no-anim *::before, .no-anim *::after{ transition:none !important; animation:none !important; }
+  .measuring *{ transition:none !important; }
+  .measuring .name-flip, .measuring .tesis-flip{ transform:none !important; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+  <main class="slide hero" id="slide">
+    <div class="hair-div"></div>
+
+    <!-- ===== RAIL IZQUIERDO 32% ===== -->
+    <!-- Todo lo que va vacío acá lo llena el script con los datos del
+         candidato. Los rótulos fijos ("En qué destaca", "Ficha", "Formación")
+         se quedan en el HTML: no cambian de proceso a proceso. -->
+    <!-- Las seis secciones de acá abajo son hijas DIRECTAS de `.rail`:
+         `justify-content:space-between` en `.rail` (ver CSS) reparte el alto
+         completo del riel entre ellas, así que no hay wrappers `.rail-top` /
+         `.rail-foot` ni líneas divisorias — el espacio en blanco ES la
+         separación. -->
+    <section class="rail">
+      <!-- Identidad + foto en una sola fila: a la izquierda el nombre y a
+           la derecha el círculo, centrado contra ese bloque (ahora sólo el
+           nombre — cargo/empresa se movió más abajo, ver .titular-block).
+           El .name-flip sigue siendo el elemento que viaja al centro en el
+           hero, y la foto es HERMANA suya a propósito: si estuviera
+           adentro, escalaría x2.5 con el nombre y además correría el
+           centro que calcula measure(). -->
+      <div class="ident-head">
+        <div class="ident-txt">
+          <div class="name-flip" id="nameFlip">
+            <h1 class="name"></h1>
+          </div>
+        </div>
+        <!-- Lo de adentro (imagen o iniciales) lo pone el script. -->
+        <div class="foto"></div>
+      </div>
+
+      <div class="ficha-block">
+        <div class="blk-label fic fic1">Ficha</div>
+        <p class="ident-ficha fic fic2"></p>
+      </div>
+
+      <div class="foot-block-2">
+        <div class="blk-label fic fic3">Formación</div>
+        <!-- Una fila por estudio. `.val.ok` = "✓ VALIDADO", verificado por
+             Mandomedio; `.val` a secas = "PENDIENTE", todavía sin respaldo.
+             Dice PENDIENTE y no "declarado" porque describe el estado de la
+             verificación (algo que le falta a Mandomedio), no una duda sobre
+             la candidata. La pill solo va en estudios[0] (el título base,
+             por contrato de SCHEMA.md): diplomados y magísteres no la
+             llevan. OJO: la comparativa tiene su propio lenguaje para
+             esto ("Sin validar") y no se toca; el dato de origen sigue
+             siendo el mismo `validado:true|false`. -->
+        <ul class="estudios"></ul>
+      </div>
+
+      <!-- Cargo actual/último cargo + empresa. El rótulo lo pone el script
+           ("Cargo actual y empresa" / "Último cargo y empresa", según
+           `trabajando`) — reemplaza al marcador `.estado` que antes iba
+           pegado al cargo, para no decir lo mismo dos veces. -->
+      <div class="titular-block">
+        <p class="blk-label" id="cargoLabel"></p>
+        <p class="titular-org"></p>
+        <p class="titular"></p>
+        <!-- Desde cuándo está en ESE rol (no en la empresa). Sale de los datos
+             ya escrito; la lámina no lo calcula. -->
+        <p class="titular-desde"></p>
+      </div>
+
+      <!-- La animación de la tesis (zoom al centro en el paso s-tesis y
+           "aterrizaje" en s-park) se calcula en vivo por `measure()` a partir
+           de dónde esté parada en cada momento, así que no depende de su
+           posición en el riel. -->
+      <div class="tesis-flip" id="tesisFlip">
+        <p class="tesis-kicker">En qué destaca</p>
+        <p class="tesis-text"></p>
+      </div>
+
+      <!-- Botón del currículum: la afordancia principal para abrirlo (el
+           atajo ↓ sigue existiendo, pero ya no se anuncia). Ver el bloque
+           "BOTÓN DEL CURRÍCULUM" del CSS para el porqué de su aspecto. El
+           clic no abre nada acá: le avisa al SHELL, que es quien monta la
+           modal — un iframe no puede pintar fuera de su propia caja, así que
+           desde adentro taparíamos la lámina pero no la pantalla. Si el
+           candidato no trae `cv`, el JS lo saca. -->
+      <button type="button" class="cv-link" id="cvLink">
+        <span>Ver currículum</span>
+        <svg class="cv-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M13 6l6 6-6 6"/>
+        </svg>
+      </button>
+    </section>
+
+    <!-- ===== ZONA DERECHA 68% — 3 filas ===== -->
+    <section class="stage-zone">
+      <!-- Fila 1: EVIDENCIA -->
+      <div class="card evid-card">
+        <div class="cbody">
+          <div class="chap-evid">
+            <p class="k-kicker">Experiencia</p>
+            <p class="lead"></p>
+            <!-- Las etiquetas de los grupos ("Funciones principales" /
+                 "Logros") son FIJAS y las escribe el script: ver el bloque
+                 "Evidencia" más abajo para el porqué. -->
+            <ul class="evid"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fila 2: CHECK -->
+      <div class="card check-band">
+        <div class="cbody">
+          <div class="chap-check">
+            <p class="k-label">Requisitos del cargo</p>
+            <!-- La lista de pills es FIJA para todo el deck (PROCESO.requisitosCargo,
+                 sólo los requisitos VARIABLES del descriptor — lo transversal, como
+                 título validado o comuna, ya vive en la ficha del rail). Todas las
+                 candidatas muestran las MISMAS pills, en el mismo orden: lo que
+                 cambia es cuál está pintada. `.pill` sólida con ✓ = cumple ·
+                 `.pill--off` sin relleno = no cumple. -->
+            <div class="pills"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fila 3: Dúo (Motivos + Económico) -->
+      <div class="duo">
+        <!-- Motivos -->
+        <div class="card moveria">
+          <div class="cbody">
+            <div class="chap-moveria">
+              <p class="k-kicker">Motivación por el cargo</p>
+              <p class="mot-frase"></p>
+
+              <hr class="mv-divider">
+
+              <p class="mv-label">Motivos de salida</p>
+              <div class="exits"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Económico -->
+        <div class="card economia">
+          <div class="cbody">
+            <div class="chap-econ">
+              <div class="econ">
+                <p class="econ-ctx econ-now-ctx">Renta líquida actual</p>
+                <p class="econ-fig econ-now"></p>
+                <div class="econ-rule"></div>
+                <p class="econ-ctx econ-want-ctx">Pretensión de renta líquida</p>
+                <p class="econ-fig econ-want"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    (function(){
+      function q(sel){ return document.querySelector(sel); }
+      function el(tag, cls, txt){
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (txt != null) n.textContent = txt;
+        return n;
+      }
+      // Montos SIEMPRE completos y en pesos ($1.550.000), nunca abreviados. Sin
+      // dato declarado va una raya, no un cero: son cosas distintas.
+      function pesos(n){
+        return (typeof n === 'number' && isFinite(n)) ? '$' + n.toLocaleString('es-CL') : '—';
+      }
+      /* Iniciales del placeholder de la foto: nombre + primer apellido
+         ("Ester Ortiz Urra" → EO). Se saltan las partículas ("de", "la",
+         "del"…) para no terminar con una "D" que no dice nada. Con un solo
+         nombre queda una sola letra, y eso está bien. */
+      function iniciales(nombre){
+        var PARTICULAS = /^(de|del|la|las|los|y|da|do|van|von)$/i;
+        var ws = String(nombre || '').trim().split(/\s+/).filter(function(w){
+          return w && !PARTICULAS.test(w);
+        });
+        return ws.slice(0, 2).map(function(w){ return w.charAt(0).toUpperCase(); }).join('');
+      }
+      function fallo(msg){
+        document.title = 'Faltan datos del proceso';
+        document.body.innerHTML = '';
+        var box = el('div','fallo');
+        box.appendChild(el('p','fallo-t','No se pudo armar esta lámina'));
+        box.appendChild(el('p','fallo-d', msg));
+        document.body.appendChild(box);
+      }
+
+      /* ===== 1. DATOS → DOM ===================================================
+         Esta lámina es una plantilla: el contenido sale de window.PROCESO
+         (data/proceso.js) y el candidato lo elige el shell con ?c=<índice>.
+         El render corre ACÁ, antes de measure() y antes de encender la
+         coreografía: measure() calcula el viaje del nombre y de la tesis desde
+         sus rectángulos reales, así que si el texto entrara después, el FLIP
+         apuntaría a coordenadas de un DOM vacío. */
+      var P = window.PROCESO;
+      if (!P || !P.candidatos){
+        fallo('data/proceso.js no cargó o tiene un error de sintaxis.');
+        return;
+      }
+      var ci = parseInt(new URLSearchParams(location.search).get('c'), 10);
+      var cand = (ci >= 0) ? P.candidatos[ci] : null;
+      if (!cand || !cand.perfil){
+        fallo('No hay datos de perfil para el candidato que pide esta lámina. Revisa data/proceso.js.');
+        return;
+      }
+      var perfil = cand.perfil;
+
+      document.title = cand.pila + ' — perfil' + (P.meta && P.meta.cargo ? ' · ' + P.meta.cargo : '');
+
+      /* -- Rail · identidad --
+         El nombre va en dos líneas: la pila arriba, los apellidos abajo. Si
+         `pila` no es el primer nombre de `nombre`, se muestra el nombre
+         completo de corrido antes que inventar un quiebre. */
+      var nameEl = q('.name');
+      var apellidos = cand.nombre.indexOf(cand.pila + ' ') === 0
+        ? cand.nombre.slice(cand.pila.length).trim()
+        : '';
+      if (apellidos){
+        nameEl.textContent = cand.pila;
+        nameEl.appendChild(document.createElement('br'));
+        nameEl.appendChild(document.createTextNode(apellidos));
+      } else {
+        nameEl.textContent = cand.nombre;
+      }
+
+      /* -- Rail · foto --
+         `foto` es un campo OPCIONAL del candidato (ver data/proceso.js). Si
+         no viene, el círculo NO se apaga: se dibuja igual con las iniciales,
+         porque el espacio está reservado en la composición y dejarlo vacío
+         correría el nombre.
+         La ruta se escribe relativa a deck-template/ ("assets/fotos/x.jpg"),
+         igual que el resto de los assets del deck; esta lámina vive en
+         slides/, así que le antepone "../". Una URL absoluta o un data: pasan
+         tal cual. Si la imagen no carga se cae al placeholder: una foto rota
+         adentro del círculo se ve peor que no tener foto. */
+      var fotoEl = q('.foto');
+      function pintaIniciales(){
+        var ini = el('span', 'foto-ini', iniciales(cand.nombre));
+        ini.setAttribute('aria-hidden', 'true');   // el nombre completo está al lado
+        fotoEl.appendChild(ini);
+      }
+      if (cand.foto){
+        var fimg = el('img', 'foto-img');
+        fimg.alt = 'Foto de ' + cand.pila;
+        fimg.onerror = function(){ fotoEl.innerHTML = ''; pintaIniciales(); };
+        fimg.src = /^(https?:|data:|\/)/.test(cand.foto) ? cand.foto : '../' + cand.foto;
+        fotoEl.appendChild(fimg);
+      } else {
+        pintaIniciales();
+      }
+
+      // El rótulo del bloque dice "Cargo actual y empresa" o "Último cargo y
+      // empresa" según `trabajando` — reemplaza al marcador `.estado` que
+      // antes iba pegado al cargo: la distinción ahora se lee en el título
+      // del bloque, no repetida dos veces.
+      q('#cargoLabel').textContent = cand.trabajando ? 'Cargo actual y empresa' : 'Último cargo y empresa';
+
+      // Si el candidato no trae empresa o cargo actual, la línea se apaga en
+      // vez de quedar coja.
+      var orgEl = q('.titular-org');
+      if (cand.empresaActual) orgEl.textContent = cand.empresaActual;
+      else orgEl.style.display = 'none';
+
+      var titEl = q('.titular');
+      if (cand.cargoActual) titEl.textContent = cand.cargoActual;
+      else titEl.style.display = 'none';
+
+      /* Desde cuándo está en ESE cargo. `desde` viene ya escrito ("May 2019", o
+         sólo el año si el CV no da el mes); la lámina no parsea fechas. Si el
+         candidato ya no está en el cargo y se sabe hasta cuándo estuvo, se
+         pinta el tramo completo — un "Desde jun 2025" en alguien que salió en
+         marzo se leería como que sigue ahí. */
+      var desdeEl = q('.titular-desde');
+      if (cand.desde && !cand.trabajando && cand.hasta){
+        desdeEl.textContent = cand.desde + ' — ' + cand.hasta;
+      } else if (cand.desde){
+        desdeEl.textContent = 'Desde ' + cand.desde;
+      } else {
+        desdeEl.style.display = 'none';
+      }
+
+      /* -- Rail · tesis (richtext: acepta <b>) -- */
+      q('.tesis-text').innerHTML = perfil.tesis || '';
+
+      /* -- Rail · ficha --
+         `ubicacion` es la línea propia de la ficha; si el proceso sólo trae
+         comuna y región, se arma con esas. */
+      var donde = cand.ubicacion || [cand.comuna, cand.region].filter(Boolean).join(', ');
+      var ficha = [];
+      if (cand.edad) ficha.push(cand.edad + ' años');
+      if (donde) ficha.push(donde);
+      q('.ident-ficha').textContent = ficha.join(' · ');
+
+      /* -- Rail · formación --
+         El stagger de la ficha llega hasta fic6: caben tres estudios. El
+         primero es el título principal (el mismo que muestra la comparativa). */
+      var estudios = (cand.estudios || []).slice(0, 3);
+      var ulEst = q('.estudios');
+      estudios.forEach(function(e, i){
+        var li = el('li', 'estudio fic fic' + (4 + i));
+        var txt = el('span', 'estudio-txt', e.institucion ? e.titulo + ' ' : e.titulo);
+        if (e.institucion) txt.appendChild(el('span','inst', '· ' + e.institucion));
+        li.appendChild(txt);
+        if (i === 0){
+          li.appendChild(e.validado ? el('span','val ok','✓ Validado') : el('span','val','Pendiente'));
+        }
+        ulEst.appendChild(li);
+      });
+      if (!estudios.length) q('.foot-block-2').style.display = 'none';
+
+      /* -- Rail · botón del currículum --
+         Sólo le manda un comando al shell: la modal la monta él. Va por el
+         mismo canal que ya usan las teclas globales (`_nav.js`), con una
+         clave propia — `cv` — en vez de reusar 'ArrowDown', para que el
+         camino del botón se lea distinto del atajo en el código del shell.
+         Sin `cv` en los datos no hay nada que abrir: el botón se saca del
+         layout en vez de quedar muerto. Ojo, `display:none` y no el atributo
+         `hidden`: la clase declara `display:inline-flex` y le gana. */
+      var cvBtn = q('#cvLink');
+      if (cand.cv){
+        cvBtn.addEventListener('click', function(){
+          try { parent.postMessage({ deck: 'cmd', key: 'cv' }, '*'); } catch (err) {}
+        });
+      } else {
+        cvBtn.style.display = 'none';
+      }
+
+      /* -- Evidencia --
+         Las dos etiquetas son CONSTANTES DE LA PLANTILLA, no dato: los ejes
+         libres que traía antes cada proceso ("Municipios", "Terreno", …)
+         hacían que dos perfiles no se pudieran comparar, porque cada uno
+         inventaba sus propias categorías. Con rótulos fijos, la clienta lee
+         el mismo par de preguntas — qué hace y qué consiguió — en todos los
+         candidatos, línea a línea.
+         El dato aporta sólo los textos, en dos listas (`funciones`, `logros`),
+         y cada grupo admite una o más líneas bajo una sola etiqueta. Un grupo
+         vacío o ausente no se dibuja: hay candidatos sin logros declarados y
+         una etiqueta huérfana se leería como un dato faltante. */
+      var evidencia = perfil.evidencia || {};
+      q('.lead').innerHTML = evidencia.lead || '';
+
+      var GRUPOS_EVID = [
+        { etiqueta: 'Funciones principales', lineas: evidencia.funciones },
+        { etiqueta: 'Logros',                lineas: evidencia.logros },
+      ];
+      // Tope de tres líneas por grupo: es lo que cabe en la card sin apretar
+      // el resto de la lámina.
+      var TOPE_LINEAS = 3;
+      /* Escalonado de entrada: el CSS enciende, pero el retardo se calcula
+         acá porque el número de líneas por grupo es variable. La etiqueta
+         entra primero (el ojo va al rótulo) y sus líneas la siguen; el grupo
+         siguiente arranca donde terminó el anterior. Tiempos en segundos, en
+         la misma cadencia que traía la versión de tres ítems fijos: el primer
+         rótulo a 1.15 s, justo después del lead. */
+      var tEvid = 1.15, PASO_EVID = .4, SANGRIA_EVID = .15, finEvid = 0;
+      var ulEvid = q('.evid');
+      GRUPOS_EVID.forEach(function(g){
+        var lineas = (g.lineas || []).slice(0, TOPE_LINEAS);
+        if (!lineas.length) return;
+
+        var li = el('li');
+        var eje = el('span','eje', g.etiqueta);
+        eje.style.transitionDelay = tEvid.toFixed(2) + 's';
+        li.appendChild(eje);
+
+        var col = el('div','evid-lineas');
+        lineas.forEach(function(txt, i){
+          var d = tEvid + SANGRIA_EVID + i * PASO_EVID;
+          var linea = el('span','evid-text', txt);
+          linea.style.transitionDelay = d.toFixed(2) + 's';
+          col.appendChild(linea);
+          if (d > finEvid) finEvid = d;
+        });
+        li.appendChild(col);
+        ulEvid.appendChild(li);
+
+        tEvid += SANGRIA_EVID + lineas.length * PASO_EVID;
+      });
+      // Cuánto dura, de verdad, la coreografía de este paso (último retardo +
+      // la transición de la línea): DUR lo usa para saber si sigue en vuelo.
+      // Se calcula porque ahora depende de cuántas líneas trajo el candidato.
+      var DUR_EVID = Math.max(1400, Math.round((finEvid + .6) * 1000));
+
+      /* -- Requisitos del cargo --
+         La lista de pills sale de `P.requisitosCargo` (fija para todo el
+         deck, no por candidata) — es lo que permite comparar de un vistazo
+         entre perfiles: la pill de "Excel", por ejemplo, está siempre en el
+         mismo lugar para todas. Lo que varía por candidata es sólo si la
+         cumple: `perfil.requisitos` es un mapa `{key: true|false}` contra las
+         `key` de `requisitosCargo`; una key ausente cuenta como `false` (no
+         cumple), nunca se asume `true`. Tope de ocho: es hasta donde llega
+         el stagger del CSS. */
+      var pillsEl = q('.pills');
+      var reqCumple = perfil.requisitos || {};
+      (P.requisitosCargo || []).slice(0, 8).forEach(function(req){
+        var cumple = !!reqCumple[req.key];
+        var p = el('span', cumple ? 'pill' : 'pill pill--off');
+        if (cumple) p.appendChild(el('span','tick','✓'));
+        p.appendChild(document.createTextNode(req.label));
+        pillsEl.appendChild(p);
+      });
+
+      /* -- Motivación y motivos de salida --
+         Cuatro salidas como máximo (el tope del stagger). Sin salidas el bloque
+         se mantiene y responde "No aplica" — es el candidato de una sola
+         empresa, no un dato que falte. */
+      q('.mot-frase').innerHTML = perfil.motivacion || '';
+      var salidas = (perfil.salidas || []).slice(0, 4);
+      var exitsEl = q('.exits');
+      salidas.forEach(function(s){
+        var p = el('p','exit-row');
+        var caso = el('span','exit-caso');
+        caso.appendChild(el('span','exit-org', s.org));
+        caso.appendChild(document.createTextNode(' — ' + s.motivo));
+        p.appendChild(caso);
+        // `duracion` viene YA ESCRITA en los datos (ver data/proceso.js): la
+        // lámina la pinta, no la calcula. Cuando la salida no calza con
+        // ninguna entrada de la trayectoria el campo no existe, y entonces no
+        // se dibuja nada — el caso ocupa la fila completa, sin hueco raro.
+        if (s.duracion) p.appendChild(el('span','exit-dur', s.duracion));
+        exitsEl.appendChild(p);
+      });
+      /* Sin salidas = primera y única empresa del candidato. El rótulo se queda
+         y la fila dice "No aplica": es una respuesta, no un vacío. */
+      if (!salidas.length){
+        exitsEl.appendChild(el('p','exit-row exit-na','No aplica'));
+      }
+
+      /* -- Económico -- */
+      // Sin rentaActual (el proceso decidió no mostrarla, no es un dato que
+      // falte): la fila "Renta líquida actual" se saca entera vía CSS
+      // (`.econ--solo`) y la pretensión pasa a ocupar toda la tarjeta.
+      var tieneRentaActual = typeof cand.rentaActual === 'number' && isFinite(cand.rentaActual);
+      q('.econ').classList.toggle('econ--solo', !tieneRentaActual);
+      q('.econ-now').textContent = pesos(cand.rentaActual);
+      q('.econ-want').textContent = pesos(cand.rentaPretension);
+
+      /* ===== 2. COREOGRAFÍA (a partir de acá, el DOM ya está completo) ===== */
+      var slide = document.getElementById('slide');
+      var nameFlip = document.getElementById('nameFlip');
+      var tesisFlip = document.getElementById('tesisFlip');
+      var stageZone = document.querySelector('.stage-zone');
+
+      // 1 ficha+formación · 2 cargo/empresa · 3 tesis al centro · 4 la tesis
+      // viaja al rail (y ahí mismo aparece el botón del currículum) · 5
+      // experiencia · 6 check · 7 movería · 8 económico.
+      var STEPS = ['s-ficha','s-titular','s-tesis','s-park','s-evid','s-check','s-moveria','s-economia'];
+      // Duración de la coreografía por paso (ms), indexada 1..8 → sirve para
+      // saber si una transición sigue en vuelo y hacer flush al clic. El paso
+      // 5 (experiencia) es el único variable: depende de cuántas líneas de
+      // evidencia trajo el candidato, así que lo aporta el render.
+      var DUR = [0, 1400, 1500, 1500, 1000, DUR_EVID, 1600, 2200, 2400];
+
+      // ?at=end → el shell entró a esta lámina retrocediendo: se pinta completa
+      // y sin animar, para que la flecha izquierda siga deshaciendo pasos en
+      // orden inverso en vez de reiniciar la coreografía.
+      var startAtEnd = new URLSearchParams(location.search).get('at') === 'end';
+
+      var idx = startAtEnd ? STEPS.length : 0;
+      var animating = false;
+      var animTimer = null;
+      var NS = 2.5, TS = 1.6;
+
+      function hero(){ slide.classList.toggle('hero', idx === 0); }
+
+      function measure(){
+        var wasHero = slide.classList.contains('hero');
+        slide.classList.add('measuring');
+        slide.classList.remove('hero');
+        void slide.offsetWidth;
+
+        var n = nameFlip.getBoundingClientRect();
+        var ndx = (window.innerWidth  - n.width  * NS) / 2 - n.left;
+        var ndy = (window.innerHeight - n.height * NS) / 2 - n.top;
+        slide.style.setProperty('--hero-transform',
+          'translate(' + ndx.toFixed(1) + 'px,' + ndy.toFixed(1) + 'px) scale(' + NS + ')');
+
+        var z = stageZone.getBoundingClientRect();
+        var t = tesisFlip.getBoundingClientRect();
+        var tdx = (z.left + (z.width  - t.width  * TS) / 2) - t.left;
+        var tdy = (z.top  + (z.height - t.height * TS) / 2) - t.top;
+        tesisFlip.style.setProperty('--tesis-transform',
+          'translate(' + tdx.toFixed(1) + 'px,' + tdy.toFixed(1) + 'px) scale(' + TS + ')');
+
+        // El asentado NO puede hacerse con `.measuring` puesto: esa clase fuerza
+        // `transform:none`, así que el reflow fijaría el nombre en su posición
+        // del rail y, al quitarla, el transform hero entraría CON transición —
+        // el nombre viajando desde la esquina superior izquierda hasta el
+        // centro. Se cambia a `.no-anim`, que mata la transición pero respeta
+        // el transform: la posición hero queda aplicada de una, sin viaje.
+        if (wasHero) slide.classList.add('hero');
+        slide.classList.add('no-anim');
+        slide.classList.remove('measuring');
+        void slide.offsetWidth;
+        slide.classList.remove('no-anim');
+      }
+
+      // Estado inicial: entrada normal (coreografía desde cero) o lámina ya
+      // completa si se entró retrocediendo.
+      if (startAtEnd){
+        slide.classList.add('no-anim');
+        STEPS.forEach(function(c){ slide.classList.add(c); });
+        slide.classList.add('play');
+      }
+      measure();
+      hero();
+      if (startAtEnd){
+        void slide.offsetWidth;                 // fija el estado final sin animar
+        slide.classList.remove('no-anim');
+      } else {
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){ slide.classList.add('play'); });
+        });
+      }
+      if (document.fonts && document.fonts.ready){ document.fonts.ready.then(measure); }
+      var rz;
+      window.addEventListener('resize', function(){
+        clearTimeout(rz); rz = setTimeout(measure, 120);
+      });
+
+      function flush(){
+        clearTimeout(animTimer);
+        animating = false;
+        slide.classList.add('no-anim');
+        void slide.offsetWidth;
+        slide.classList.remove('no-anim');
+      }
+      function startTimer(step){
+        animating = true;
+        clearTimeout(animTimer);
+        animTimer = setTimeout(function(){ animating = false; }, DUR[step] || 1200);
+      }
+
+      window.deckStep = function(dir){
+        if (dir > 0){
+          if (animating) flush();
+          if (idx >= STEPS.length) return false;
+          slide.classList.add(STEPS[idx]);
+          idx++;
+          hero();
+          startTimer(idx);
+          return true;
+        }
+        if (dir < 0){
+          if (animating) flush();
+          if (idx <= 0) return false;
+          idx--;
+          slide.classList.add('no-anim');
+          slide.classList.remove(STEPS[idx]);
+          hero();
+          void slide.offsetWidth;
+          slide.classList.remove('no-anim');
+          return true;
+        }
+        return false;
+      };
+
+      // El teclado NO se escucha acá: lo hace _nav.js, que es el único punto de
+      // entrada — venga la flecha del shell o del foco dentro del iframe — y
+      // avisa al shell cuándo ya no quedan pasos. Dos listeners consumirían dos
+      // pasos por tecla. Tampoco hay clic-para-avanzar: un clic suelto no debe
+      // consumir un paso, si no cualquier control de la lámina queda inusable.
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Título de respaldo: el real lo arma el script con el cargo de PROCESO. -->
+<title>Presentación de candidatos · Mandomedio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* El TEMA es global del deck, no propiedad de cada lámina: el shell lo guarda,
+     lo pasa a la lámina por ?theme= y tiñe su propio chrome. Cada lámina define
+     sus tokens para los dos temas, así que existe en claro y en oscuro sin
+     duplicar archivos. Toggle con la tecla T; se recuerda en localStorage. */
+  :root{ --orange:#FD650D; --navy:#1E2D3B; --peach:#FFAE7F; }
+  /* El velo es PLANO (un color con alfa), nunca un gradiente: el brandbook los
+     prohíbe y acá además delatarían el borde del panel. Sobre oscuro el velo no
+     puede ser navy —el fondo YA es navy y no oscurecería nada—, así que va
+     negro con alfa, la misma tinta de las sombras del deck. */
+  :root[data-theme="dark"]{  --deck-bg:#1E2D3B; --deck-ink:#FFFFFF;
+    --veil:rgba(0,0,0,.55); --panel-br:rgba(255,255,255,.14);
+    --panel-sh:0 30px 60px rgba(0,0,0,.45); --panel-hover:rgba(255,255,255,.10); }
+  :root[data-theme="light"]{ --deck-bg:#FFFFFF; --deck-ink:#1E2D3B;
+    --veil:rgba(30,45,59,.42); --panel-br:#E8EAED;
+    --panel-sh:0 30px 60px rgba(30,45,59,.18); --panel-hover:rgba(30,45,59,.06); }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--deck-bg);overflow:hidden;font-family:Inter,sans-serif;
+    transition:background-color .45s ease}
+  /* La lámina llena la ventana. Antes el marco estaba clavado a 16:9
+     (min(100vw,177.78vh) × min(56.25vw,100vh)), lo que dejaba barras del color
+     del body cuando la ventana no era exactamente 16:9. Las láminas se
+     maquetan con vh/vw y clamps, así que reflowean solas al ratio real; en
+     ratios muy extremos las más densas recortan por abajo antes que romperse. */
+  #stage{position:absolute;inset:0}
+  #frameWrap{position:absolute;inset:0;background:var(--deck-bg);transition:background-color .45s ease}
+  iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+
+  /* ===== PISO TIPOGRÁFICO DEL CHROME (12 px) =====
+     El deck se proyecta a pantalla completa y el iframe NO escala: 11 px son
+     11 px reales, se lea a un metro o a seis. Ningún texto del shell baja de
+     12 px. Y ojo con el TECHO del clamp: es él —no el piso— el que dejaba el
+     texto chico en pantalla grande; un clamp que tope en 10,5 px se ve igual
+     de chico en un 4K que en un notebook. Por eso sube piso Y techo. */
+  .chrome{position:absolute;z-index:10;color:var(--deck-ink);transition:color .45s ease}
+  #pager{right:20px;bottom:20px;font-size:clamp(12px,1.35vh,14px);font-weight:500;letter-spacing:.04em;opacity:.8}
+  #dots{left:50%;transform:translateX(-50%);bottom:20px;display:flex;gap:8px;align-items:center}
+  /* Los puntos no tienen font-size, pero les corre la misma lógica: a 8 px no
+     se distinguía cuál estaba activo desde el fondo de la sala. */
+  #dots button{width:10px;height:10px;border-radius:50%;border:0;padding:0;cursor:pointer;
+    background:currentColor;opacity:.32;transition:opacity .2s,transform .2s}
+  #dots button.active{opacity:1;transform:scale(1.35)}
+  /* Zona de clic ACOTADA al chevron. Antes eran dos franjas del 14% de ancho y
+     alto completo: tapaban los controles de las láminas interactivas — el
+     botón "Limpiar" del comparador caía dentro de la franja derecha, así que
+     un clic ahí avanzaba de lámina en vez de limpiar la selección. */
+  .nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:72px;z-index:11;
+    cursor:pointer;background:transparent;border:0;
+    display:flex;align-items:center;justify-content:center;color:currentColor;opacity:0;transition:opacity .2s}
+  .nav:hover{opacity:.55}
+  #prev{left:8px}
+  #next{right:8px}
+  .nav svg{width:30px;height:30px}
+
+  /* El logo vive en el SHELL, no en las láminas: se monta una sola vez, así
+     nunca se re-anima ni cambia de posición al pasar de lámina. Lo único que
+     ocurre es un crossfade entre la versión positiva y la negativa cuando
+     cambia el tema. Las láminas que traen su propio logo (portada,
+     comparativa) lo apagan con `logo:'none'`. */
+  #deckLogo{position:absolute;left:clamp(30px,3.2vw,48px);bottom:clamp(20px,2.8vh,32px);
+    height:30px;z-index:12;pointer-events:none;
+    opacity:0;transition:opacity .45s ease}
+  #deckLogo.show{opacity:.9}
+  #deckLogo img{position:absolute;left:0;bottom:0;height:30px;width:auto;display:block;
+    transition:opacity .45s ease}
+  #deckLogo .ln{opacity:0}
+  :root[data-theme="dark"] #deckLogo .lp{opacity:0}
+  :root[data-theme="dark"] #deckLogo .ln{opacity:1}
+
+  /* ===== MODAL DEL CURRÍCULUM ==========================================
+     POR QUÉ VIVE EN EL SHELL Y NO EN LA LÁMINA DE PERFIL — que es lo que
+     alguien va a querer "simplificar" después:
+
+     1. Un iframe NO puede pintar fuera de su propia caja. La modal montada
+        dentro de perfil.html quedaría encerrada en el iframe: no podría
+        cubrir el chrome del shell (pager, dots, flechas, logo), que en el
+        documento de arriba está por encima del iframe. Sería una modal que
+        tapa la lámina pero no la pantalla.
+     2. El currículum necesita su PROPIO iframe. Si lo cargáramos en #frame
+        (como hacía el desvío viejo) la lámina de perfil se perdería y al
+        cerrar habría que volver a montarla con ?at=end. Con un segundo
+        iframe, #frame no se toca: la lámina de abajo nunca se fue, y por eso
+        cerrar no recarga ni reinicia su coreografía.
+     3. El tema, el BUILD y el ruteo del teclado ya viven acá. Desde adentro
+        del iframe habría que reenviar todo eso dos veces.
+
+     El velo es PLANO (ver los tokens --veil arriba). El panel usa radius 20
+     como las cards del deck y un borde de 1px, sin barra de acento. */
+  #cvOverlay{position:absolute;inset:0;z-index:20;display:none;
+    align-items:center;justify-content:center;
+    padding:clamp(20px,4vh,40px) clamp(20px,4vw,60px);
+    background:var(--veil);opacity:0;transition:opacity .28s ease}
+  #cvOverlay.open{display:flex}
+  #cvOverlay.shown{opacity:1}
+  /* Grande de verdad: el currículum tiene que leerse cómodo, no en una
+     ventanita. El panel toma todo el alto disponible y hasta 1600px de ancho;
+     la propia lámina de CV centra su contenido en 1140px, así que el sobrante
+     queda como aire lateral, igual que en el resto del deck. */
+  #cvPanel{position:relative;width:100%;max-width:1600px;height:100%;
+    background:var(--deck-bg);border:1px solid var(--panel-br);border-radius:20px;
+    overflow:hidden;box-shadow:var(--panel-sh);
+    transform:translateY(12px) scale(.99);
+    transition:transform .28s cubic-bezier(.22,1,.36,1)}
+  #cvOverlay.shown #cvPanel{transform:none}
+  #cvPanel:focus{outline:none}
+  #cvFrame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+  /* Botón de cierre: círculo (radius 50%, que es lo que manda el brandbook
+     para íconos circulares), sin relleno de color. Va sobre el encabezado del
+     CV, que está alineado a la izquierda y deja esa esquina libre. */
+  #cvClose{position:absolute;top:20px;right:20px;z-index:2;
+    width:40px;height:40px;border-radius:50%;padding:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    background:transparent;border:1px solid var(--panel-br);color:var(--deck-ink);
+    opacity:.6;transition:opacity .2s ease,background-color .2s ease}
+  #cvClose:hover{opacity:1;background:var(--panel-hover)}
+  #cvClose:focus-visible{opacity:1;outline:2px solid var(--orange);outline-offset:2px}
+  #cvClose svg{width:18px;height:18px}
+
+  /* Aviso efímero del tema al pulsar T. */
+  #themeToast{position:absolute;top:20px;left:50%;transform:translateX(-50%);
+    z-index:14;pointer-events:none;
+    font-size:clamp(12px,1.3vh,13.5px);font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--deck-ink);background:rgba(128,128,128,.16);
+    padding:6px 14px;border-radius:9999px;
+    opacity:0;transition:opacity .3s ease}
+  #themeToast.show{opacity:.75}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="frameWrap"><iframe id="frame" title="slide"></iframe></div>
+  </div>
+  <button class="nav chrome" id="prev" aria-label="anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+  <button class="nav chrome" id="next" aria-label="siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+  <div class="chrome" id="pager"></div>
+  <div class="chrome" id="dots"></div>
+  <div id="deckLogo">
+    <img class="lp" src="assets/logo-horizontal-positivo.svg" alt="Mandomedio">
+    <img class="ln" src="assets/logo-horizontal-negativo.svg" alt="">
+  </div>
+  <div id="themeToast"></div>
+
+  <!-- Modal del currículum. Vive acá, en el shell, y no dentro de la lámina:
+       el porqué está escrito completo en el bloque #cvOverlay del CSS.
+       El panel es enfocable (tabindex="-1") para poder MANDARLE el foco al
+       abrir: sin eso, quien navega con teclado quedaría con el foco atrás,
+       en la lámina tapada. -->
+  <div id="cvOverlay" aria-hidden="true">
+    <div id="cvPanel" role="dialog" aria-modal="true" aria-label="Currículum del candidato" tabindex="-1">
+      <iframe id="cvFrame" title="Currículum del candidato"></iframe>
+      <button id="cvClose" type="button" aria-label="Cerrar el currículum">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+<!-- La información del proceso (window.PROCESO) va ANTES del script principal:
+     carga síncrona, sin fetch, así el deck funciona abierto con doble clic
+     (file://) igual que servido por HTTP. -->
+<script src="data/proceso.js"></script>
+<script>
+// Sin datos no hay deck. Si data/proceso.js no cargó o tiene un error de
+// sintaxis, el resto de este script reventaría con mensajes de consola que no
+// le sirven a nadie: mejor cortar acá y decirlo en pantalla, en castellano.
+// El aviso lleva sus colores literales de respaldo porque acá todavía no corrió
+// el bloque de tema: sin data-theme en <html>, --deck-bg/--deck-ink no existen.
+if(!window.PROCESO){
+  document.body.innerHTML =
+    '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;'
+    + 'padding:40px;text-align:center;font-family:Inter,sans-serif;'
+    + 'background:var(--deck-bg,#FFFFFF);color:var(--deck-ink,#1E2D3B)">'
+    + '<div style="max-width:520px">'
+    + '<p style="font-size:20px;font-weight:600;margin:0 0 12px">No se pudo cargar la presentación</p>'
+    + '<p style="font-size:15px;line-height:1.5;margin:0;opacity:.8">'
+    + 'data/proceso.js no cargó o tiene un error de sintaxis.</p>'
+    + '</div></div>';
+  throw new Error('data/proceso.js no cargó o tiene un error de sintaxis');
+}
+const P = window.PROCESO;
+document.title = 'Presentación de candidatos · '+P.meta.cargo+' · Mandomedio';
+
+// El ORDEN de las láminas es fijo; lo que varía por proceso es cuántos
+// candidatos traen `perfil` (y si además traen `cv`): cada uno agrega sus
+// láminas propias entre el divisor y la comparativa, en el orden en que están
+// en PROCESO.candidatos.
+// `file` es el nombre de la plantilla (ya no hay prefijos sXX: las láminas son
+// genéricas y se pueden repetir). `params` viaja en la URL de la lámina —
+// c=<índice en PROCESO.candidatos> es cómo perfil.html / cv.html saben a quién
+// pintar.
+// logo:'none' = la lámina trae su propia marca (la portada tiene el isotipo
+// grande, la comparativa lo lleva en su header) y el del shell se apaga.
+// Ya no hay campo `bg`: el fondo lo decide el TEMA global, no la lámina.
+const SLIDES = [
+  {file:'portada.html',     title:'Portada',                      logo:'none'},
+  // El contexto va en DOS láminas: primero el universo completo (una sola
+  // columna grande: de dónde salieron los 245) y después el detalle del grupo
+  // del que hay ficha completa — hoy los 31 de hunting. Ver PROCESO.contexto:
+  // `principal` es la dimensión de la primera y `detalle` configura la segunda.
+  {file:'contexto.html',         title:'Contexto del proceso'},
+  {file:'contexto-detalle.html', title:'Perfil del grupo de hunting'},
+  // Los insights cierran el ENCUADRE, antes de ver a nadie: los dos veredictos
+  // (renta y funciones), por qué se cayó gente y qué muestra el mercado. Era la
+  // última lámina ("Conclusiones del proceso") y se movió acá — leídos después
+  // de las fichas llegaban tarde, cuando el cliente ya se hizo una opinión.
+  {file:'insights.html',         title:'Insights de la búsqueda'},
+  {file:'divisor.html',          title:'Presentación de candidatos'},
+];
+// El CV NO entra en la secuencia: cuelga del perfil como DESVÍO (campo `cv`).
+// La presentación corre perfil → perfil y el currículum se abre con ↓ sólo si
+// el cliente pregunta por algo puntual. Antes era una lámina más y obligaba a
+// pasar por los tres pasos del CV de cada candidato para llegar al siguiente.
+(P.candidatos || []).forEach(function(c, idx){
+  if(!c.perfil) return;
+  SLIDES.push({file:'perfil.html', params:'c='+idx, title:c.pila+' — perfil',
+               cv: c.cv ? ('c='+idx) : null, pila: c.pila});
+});
+SLIDES.push({file:'comparativa.html', title:'Comparativa de candidatos',    logo:'none'});
+// Cierre: qué pasa después de esta reunión. El contenido es el estándar del
+// proceso de Mandomedio y vive en la propia lámina (ver pasos.html).
+SLIDES.push({file:'pasos.html',       title:'Próximos pasos'});
+// BUILD: súbelo cada vez que edites una diapo (cache-bust del iframe → el navegador recarga el slide nuevo)
+const BUILD = '2026-08-18-1';
+const frame = document.getElementById('frame');
+const wrap = document.getElementById('frameWrap');
+const chromes = document.querySelectorAll('.chrome');
+const deckLogo = document.getElementById('deckLogo');
+const overlay = document.getElementById('cvOverlay');
+const cvPanel = document.getElementById('cvPanel');
+const cvFrame = document.getElementById('cvFrame');
+let i = 0;
+
+// ===== Tema global (claro / oscuro) =====
+// Orden de precedencia: ?theme= en la URL → lo último elegido → 'dark'.
+let theme = new URLSearchParams(location.search).get('theme')
+         || localStorage.getItem('deck-theme')
+         || 'dark';
+document.documentElement.dataset.theme = theme;
+
+const toast = document.getElementById('themeToast');
+let toastTimer = null;
+function applyTheme(next, announce){
+  theme = next;
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('deck-theme', theme);
+  // El tema entra por la URL de cada iframe, así que cambiarlo obliga a
+  // recargarlos. Con la modal abierta se recargan LOS DOS —el currículum y la
+  // lámina de atrás, que también quedó del tema viejo— pero la modal NO se
+  // cierra: cambiar de tema no tiene que devolverte al perfil.
+  // La lámina de atrás se recarga con `at=end` (completa y sin animar): correr
+  // una coreografía de ocho pasos detrás del velo, donde nadie la está mirando,
+  // es sólo trabajo perdido y un parpadeo por el borde del panel.
+  if(cvAbierta){ cargarCV(); cargarSlide(true); }
+  else go(i);
+  if (announce){
+    toast.textContent = theme === 'dark' ? 'Tema oscuro' : 'Tema claro';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>toast.classList.remove('show'), 1100);
+  }
+}
+function toggleTheme(){ applyTheme(theme === 'dark' ? 'light' : 'dark', true); }
+
+const dotsEl = document.getElementById('dots');
+SLIDES.forEach((s,idx)=>{
+  const b=document.createElement('button'); b.title=s.title; b.onclick=()=>go(idx); dotsEl.appendChild(b);
+});
+
+// atEnd = se entra a la lámina DESDE ATRÁS (flecha izquierda). La lámina se
+// pinta con todos sus pasos ya consumidos y sin animar, así el retroceso sigue
+// en orden inverso en vez de reiniciar su coreografía desde cero.
+// cvAbierta = el currículum está abierto SOBRE la lámina, en la modal. La
+// posición en la secuencia (`i`) NO cambia mientras dura: el CV es una nota al
+// pie del perfil, no un lugar propio del recorrido, así que los puntos y el
+// contador siguen marcando el perfil del que se colgó — y como ahora es una
+// capa encima, la lámina de abajo sigue montada y visible tras el velo.
+let cvAbierta = false;
+let cvReady = false;          // el iframe del CV ya cargó y escucha teclas
+let cvDesdeBoton = false;     // se abrió con el botón de la lámina, no con ↓
+let cvCerrarTimer = null;
+
+function pintarChrome(){
+  const s = SLIDES[i];
+  deckLogo.classList.toggle('show', s.logo !== 'none');
+  // Ya no lleva sufijo "· CV": el currículum dejó de ser un lugar del recorrido
+  // y pasó a ser una capa encima. Detrás del velo el contador sigue marcando la
+  // lámina en la que estás, que es la verdad.
+  document.getElementById('pager').textContent = (i+1)+' / '+SLIDES.length;
+  [...dotsEl.children].forEach((d,idx)=>d.classList.toggle('active', idx===i));
+}
+
+function cargar(url){
+  frameReady = false;
+  clearTimeout(navTimer);
+  if((frame.getAttribute('src')||'') === url){ frame.src='about:blank'; requestAnimationFrame(()=>{ frame.src=url; }); }
+  else { frame.src = url; }
+}
+
+function cargarSlide(atEnd){
+  const s = SLIDES[i];
+  cargar('slides/'+s.file+'?b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+(atEnd ? '&at=end' : ''));
+}
+
+function go(n, atEnd){
+  i = Math.max(0, Math.min(SLIDES.length-1, n));
+  cerrarCV();                         // ir a cualquier lámina cierra el currículum
+  cargarSlide(atEnd);
+  // El logo del shell no se re-monta: sólo se enciende/apaga. Su color lo
+  // resuelve el CSS según data-theme, no este JS.
+  pintarChrome();
+  history.replaceState(null,'','#'+(i+1));
+}
+
+// ===== Modal del currículum =====
+// Mientras está abierta, todo lo que hay detrás queda `inert`: no recibe foco
+// ni clics. Sin esto el Tab se escaparía del panel a las flechas y los puntos
+// del shell, que están tapados por el velo — foco invisible, que es peor que
+// no tener foco.
+const capasDeAtras = ['stage','prev','next','dots','pager'].map(id=>document.getElementById(id));
+function inerte(on){
+  capasDeAtras.forEach(n=>{ if(!n) return; if(on) n.setAttribute('inert',''); else n.removeAttribute('inert'); });
+}
+
+function cargarCV(){
+  const s = SLIDES[i];
+  if(!s.cv) return;
+  cvReady = false;
+  cvFrame.src = 'slides/cv.html?b='+BUILD+'&theme='+theme+'&'+s.cv;
+}
+
+function abrirCV(desdeBoton){
+  const s = SLIDES[i];
+  if(cvAbierta || !s.cv) return;
+  cvAbierta = true;
+  cvDesdeBoton = !!desdeBoton;
+  clearTimeout(cvCerrarTimer);
+  inerte(true);
+  overlay.setAttribute('aria-hidden','false');
+  // OJO con el orden: primero se muestra el panel y RECIÉN DESPUÉS se carga el
+  // CV. La lámina de currículum se maqueta en vh, y dentro de un iframe que
+  // está en display:none el vh vale 0 — cargarla antes de mostrar el panel la
+  // armaría contra un alto de cero.
+  overlay.classList.add('open');
+  void overlay.offsetWidth;                 // fuerza el reflow: la opacidad 0 queda aplicada
+  overlay.classList.add('shown');
+  cargarCV();
+  cvPanel.focus();
+}
+
+// Cerrar NO toca #frame: la lámina de perfil nunca se fue, así que no hay nada
+// que recargar ni ninguna coreografía que reiniciar. Ése es el punto de haber
+// hecho esto una capa y no un reemplazo.
+function cerrarCV(){
+  if(!cvAbierta) return;
+  cvAbierta = false;
+  overlay.classList.remove('shown');
+  overlay.setAttribute('aria-hidden','true');
+  inerte(false);
+  // El foco vuelve a donde estaba. Si la modal se abrió con el botón de la
+  // lámina, el foco tiene que volver A ESE BOTÓN — pero el botón vive dentro
+  // del iframe, que bajo file:// es de otro origen y no se puede enfocar desde
+  // acá. Se le pide por postMessage, que sí cruza orígenes (ver perfil.html).
+  if(cvDesdeBoton){ try{ frame.contentWindow.postMessage({deck:'foco-cv'}, '*'); }catch(err){} }
+  else { window.focus(); }
+  clearTimeout(cvCerrarTimer);
+  cvCerrarTimer = setTimeout(function(){
+    overlay.classList.remove('open');
+    // Se descarga el CV al cerrar: así la próxima vez que se abra arranca
+    // limpio (con su primer paso ya aplicado) en vez de quedar donde lo
+    // dejaron, y de paso deja de escuchar teclas mientras está tapado.
+    cvReady = false;
+    cvFrame.src = 'about:blank';
+  }, 300);
+}
+
+overlay.addEventListener('click', function(e){
+  // Sólo el clic en el VELO cierra; el que cae dentro del panel es del panel.
+  // Un clic dentro del iframe ni siquiera llega hasta acá (es otro documento).
+  if(e.target === overlay) cerrarCV();
+});
+document.getElementById('cvClose').onclick = function(){ cerrarCV(); };
+cvFrame.addEventListener('load', function(){
+  cvReady = (cvFrame.getAttribute('src') || '') !== 'about:blank';
+});
+// ===== Puente de navegación con la lámina (ver slides/_nav.js) =====
+// La lámina es la que sabe si le quedan pasos internos. El shell NO puede
+// preguntárselo llamando a frame.contentWindow.deckStep(): abierto con doble
+// clic (file://) Chrome le da a cada iframe un origen propio y ese acceso
+// lanza una excepción de seguridad — el shell terminaba saltándose la lámina
+// entera. Así que le manda la tecla por postMessage (que sí cruza orígenes) y
+// ella responde 'step' si la consumió o 'nav' si ya no le quedan pasos.
+let frameReady = false;
+let navTimer = null;
+frame.addEventListener('load', function(){
+  // El recargue en dos tiempos pasa por about:blank; ése no cuenta como listo.
+  frameReady = (frame.getAttribute('src') || '') !== 'about:blank';
+});
+
+function sendKey(dir){
+  // Con la modal abierta las flechas son del CURRÍCULUM, no de la lámina de
+  // atrás: se le mandan a su iframe. La de atrás ni se entera, que es
+  // justamente lo que se quiere — nada tiene que moverse detrás del velo.
+  const destino = cvAbierta ? cvFrame : frame;
+  // Tecla mientras la lámina carga: se ignora. Reenviarla a un documento que
+  // todavía no registró su listener la perdería, y la red de seguridad de más
+  // abajo terminaría cambiando de diapo — justo lo que se quiere evitar.
+  if(!(cvAbierta ? cvReady : frameReady)) return;
+  clearTimeout(navTimer);
+  try{ destino.contentWindow.postMessage({deck:'key', dir:dir}, '*'); }catch(err){}
+  // Red de seguridad: si la lámina no contesta (JS roto, archivo ausente) el
+  // deck no puede quedar atrapado sin poder avanzar.
+  navTimer = setTimeout(function(){ move(dir); }, 250);
+}
+function move(dir){
+  clearTimeout(navTimer);
+  // Con el currículum abierto, → no salta al candidato siguiente: se queda.
+  // Salir es un gesto explícito (la ×, Escape, el velo, ↑, o ← cuando ya no le
+  // quedan pasos al CV), porque irse de la consulta sin darse cuenta es peor
+  // que quedarse pegado. Y en ningún caso se cambia de lámina por detrás.
+  if(cvAbierta){ if(dir < 0) cerrarCV(); return; }
+  if(dir > 0){ if(i < SLIDES.length-1) go(i+1); }
+  else if(dir < 0){ if(i > 0) go(i-1, true); }
+}
+function next(){ sendKey(1); }
+function prev(){ sendKey(-1); }
+
+// De QUÉ iframe viene el mensaje. Importa desde que hay dos: con la modal
+// abierta la lámina de atrás sigue viva y su _nav.js puede mandar un 'nav' si
+// le quedó el foco adentro — hacerle caso cambiaría de lámina por detrás del
+// panel. Comparar `e.source` con el contentWindow funciona aunque el iframe sea
+// de otro origen: lo que está prohibido es leerle propiedades, no compararlo.
+function fuente(e){
+  try{ if(e.source === cvFrame.contentWindow) return 'cv'; }catch(err){}
+  try{ if(e.source === frame.contentWindow) return 'slide'; }catch(err){}
+  return null;
+}
+
+window.addEventListener('message', function(e){
+  const d = e.data;
+  if(!d || !d.deck) return;
+  // Los pasos ('step'/'nav') sólo valen si vienen del iframe que manda en este
+  // momento. Los 'cmd' son teclas globales (tema, pantalla completa, cerrar) y
+  // valen venga de donde vengan.
+  if(d.deck !== 'cmd' && fuente(e) !== (cvAbierta ? 'cv' : 'slide')) return;
+  if(d.deck === 'step'){ clearTimeout(navTimer); }            // consumió un paso interno
+  else if(d.deck === 'nav'){ move(d.dir); }                    // ya no le quedan pasos
+  else if(d.deck === 'cmd'){ command(d.key); }                 // tecla global con el foco dentro
+});
+
+document.getElementById('next').onclick = next;
+document.getElementById('prev').onclick = prev;
+
+// Las teclas que no navegan entre láminas son del deck completo, y llegan por
+// dos vías: el teclado del shell o un 'cmd' que reenvía la lámina cuando el
+// foco quedó dentro del iframe.
+function command(key){
+  // 'cv' lo manda el BOTÓN de la lámina de perfil (la afordancia principal).
+  // ↓ se queda como atajo de teclado para quien ya se acostumbró, y ↑ y Escape
+  // cierran. Se distinguen porque al cerrar hay que devolver el foco a lugares
+  // distintos: al botón si se abrió con el botón, al shell si se abrió con ↓.
+  if(key==='cv'){ abrirCV(true); }
+  else if(key==='ArrowDown'){ abrirCV(false); }
+  else if(key==='ArrowUp' || key==='Escape'){ cerrarCV(); }
+  else if(key==='Home'){ go(0); }
+  else if(key==='End'){ go(SLIDES.length-1); }
+  else if(key==='f'||key==='F'){
+    // Pantalla completa exige gesto del usuario en ESTE documento: pedida desde
+    // un mensaje de la lámina el navegador la rechaza. Se ignora en silencio.
+    if(!document.fullscreenElement){ const p = document.documentElement.requestFullscreen(); if(p && p.catch) p.catch(function(){}); }
+    else document.exitFullscreen();
+  }
+  else if(key==='t'||key==='T'){ toggleTheme(); }
+}
+
+// ↓ y ↑ dejaron de ser sinónimos de → y ←: ahora son el eje del desvío al CV
+// (bajar entra, subir vuelve). Por eso salen de las listas de avance/retroceso
+// y caen a `command`. El preventDefault se mantiene para que no scrollee.
+function onKey(e){
+  // Escape sólo significa algo con la modal abierta; si no, se deja pasar (no
+  // vaya a ser que alguien la use para salir de pantalla completa).
+  if(e.key==='Escape'){ if(cvAbierta){ e.preventDefault(); cerrarCV(); } return; }
+  if(['ArrowRight','PageDown',' '].includes(e.key)){ e.preventDefault(); next(); }
+  else if(['ArrowLeft','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+  else if(e.key==='ArrowDown' || e.key==='ArrowUp'){ e.preventDefault(); command(e.key); }
+  else { command(e.key); }
+}
+document.addEventListener('keydown', onKey);
+window.addEventListener('focus', function(){ window.focus(); });
+
+go((parseInt(location.hash.slice(1),10)||1)-1);
+</script>
+</body>
+</html>

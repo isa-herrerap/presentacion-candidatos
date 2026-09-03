@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- El título definitivo lo arma el render con el cargo de PROCESO.meta. -->
+<title>Próximos pasos — Presentación de candidatos</title>
+<!-- Lámina de CIERRE: qué pasa después de esta reunión, en 3 pasos de
+     coreografía (uno por hito). Antes era la banda inferior de la lámina de
+     conclusiones; se separó cuando esa lámina se movió al inicio como
+     "Insights de la búsqueda" — el encuadre va antes de los candidatos y el
+     cierre, después.
+     El contenido por defecto es el ESTÁNDAR del proceso de Mandomedio
+     (entrevista con el consultor → evaluación psicolaboral → entrevista con
+     el cliente) y vive acá en la plantilla, no en los datos: es igual en todos
+     los procesos. Un proceso que necesite otra cosa lo sobrescribe declarando
+     PROCESO.conclusion.pasos = [{titulo, detalle}] (2–3 entradas).
+     El nombre del cliente sale de PROCESO.meta (empresaCorta o empresa).
+     El logo lo pone el shell (deck.html), por eso acá sólo se reserva la banda
+     inferior con padding. Soporta ?at=end para entrar retrocediendo. -->
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Datos del proceso. Carga síncrona y con ruta relativa: así funciona abriendo
+     el archivo directo por file://, sin servidor. -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== TEMA ===== literales de marca + tokens que cambian por tema.
+     El peach es tinta sólo sobre oscuro; en claro pasa al naranjo profundo. */
+  :root{
+    --navy:#1E2D3B; --orange:#FD650D; --white:#FFFFFF;
+
+    --bg:#1E2D3B; --elev:#313E4B; --peach:#FFAE7F;
+    --ink:#FFFFFF;
+    --w80:rgba(255,255,255,.80); --w75:rgba(255,255,255,.75); --w55:rgba(255,255,255,.55);
+    --w45:rgba(255,255,255,.45);
+    --hair12:rgba(255,255,255,.12); --hair08:rgba(255,255,255,.08);
+    --mark-ink:#1E2D3B;                       /* tinta dentro del número sólido */
+
+    --ease:cubic-bezier(.22,1,.36,1);
+    --eoq:cubic-bezier(.23,1,.32,1);
+  }
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --elev:#F3F5F9; --peach:#B34A09;
+    --ink:#1E2D3B;
+    --w80:#333333; --w75:#4A5563; --w55:#717E8E; --w45:#A8B0BA;
+    --hair12:#E8EAED; --hair08:#EEF0F3;
+    --mark-ink:#FFFFFF;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:var(--bg); }
+  body{ font-family:"Inter",sans-serif; color:var(--ink); -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  /* ===== PISO TIPOGRÁFICO =====
+     La lámina se proyecta a pantalla completa y SIN escalado: 1 px de CSS es
+     1 px real en la pared, así que ningún texto visible baja de 12 px — y el
+     techo de cada clamp() sube junto con el piso, porque en pantalla grande
+     manda el máximo.
+     Escala de esta lámina:
+       versalita del hito     12 → 14
+       título del hito        17 → 23
+       detalle del hito       14 → 17.5 */
+
+  /* padding-bottom reserva la banda del logo del shell (abajo a la izquierda). */
+  .slide{ position:relative; width:100vw; height:100vh; background:var(--bg);
+    display:flex; flex-direction:column;
+    padding:clamp(30px,4.5vh,52px) clamp(40px,4vw,64px) clamp(64px,9vh,84px);
+    overflow:hidden; }
+
+  /* ===== Encabezado ===== */
+  .head{ flex:0 0 auto; }
+  .kicker{ font-family:"Dongra","Georgia","Times New Roman",serif; font-style:italic; font-weight:400;
+    font-size:clamp(15px,2.1vh,19px); color:var(--peach);
+    opacity:0; transform:translateY(10px);
+    transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .play .kicker{ opacity:1; transform:none; transition-delay:.12s; }
+  .title{ margin-top:4px; font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(28px,4.4vh,44px); line-height:1.05; letter-spacing:-.02em; color:var(--ink);
+    opacity:0; transform:translateY(14px);
+    transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .play .title{ opacity:1; transform:none; transition-delay:.22s; }
+  .title .accent{ color:var(--orange); }
+
+  /* ===== Los hitos =====
+     Una fila de tarjetas iguales, una por hito, con el número grande arriba.
+     `margin:auto 0` centra la fila en el alto que sobra bajo el título. */
+  .hitos{ flex:0 0 auto; margin:auto 0; display:flex; gap:clamp(16px,2.2vw,30px); }
+  .hito{ flex:1 1 0; min-width:0; display:flex; flex-direction:column;
+    background:var(--elev); border:1px solid var(--hair12); border-radius:22px;
+    padding:clamp(18px,2.8vh,30px) clamp(18px,2vw,28px);
+    opacity:0; transform:translateY(14px);
+    transition:opacity .6s var(--eoq), transform .6s var(--eoq); }
+  .s-h1 .hito:nth-child(1), .s-h2 .hito:nth-child(2), .s-h3 .hito:nth-child(3){
+    opacity:1; transform:none; }
+
+  /* El número en círculo sólido: mismo lenguaje que el ✓ de los veredictos. */
+  .hito-n{ flex:none; width:clamp(30px,4vh,40px); height:clamp(30px,4vh,40px);
+    border-radius:50%; background:var(--peach); color:var(--mark-ink);
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(15px,2.1vh,19px); line-height:1; }
+  /* Sin versalita "Paso N" sobre el título: el número ya está en el círculo de
+     arriba y repetirlo era leer dos veces lo mismo. */
+  .hito-titulo{ margin-top:clamp(12px,1.8vh,18px);
+    font-family:"Red Hat Display",sans-serif; font-weight:700;
+    font-size:clamp(17px,2.6vh,23px); line-height:1.15; letter-spacing:-.01em; color:var(--ink); }
+  .hito-detalle{ margin-top:clamp(8px,1.2vh,12px);
+    font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(14px,2vh,17.5px); line-height:1.42; color:var(--w75); }
+  .hito-detalle b{ font-weight:600; color:var(--ink); }
+
+  /* Pantalla de error cuando data/proceso.js no llegó: la ve quien edita los
+     datos, no un cliente, por eso es texto plano y directo. */
+  .data-error{ display:flex; align-items:center; justify-content:center;
+    height:100vh; padding:40px; text-align:center;
+    font-family:"Inter",sans-serif; font-size:18px; line-height:1.5; color:#FD650D; }
+
+  .no-anim *, .no-anim *::before, .no-anim *::after{ transition:none !important; animation:none !important; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+    .kicker,.title,.hito{ opacity:1 !important; transform:none !important; }
+  }
+</style>
+</head>
+<body>
+  <main class="slide" id="slide">
+    <div class="head">
+      <p class="kicker">Cómo sigue el proceso</p>
+      <h1 class="title">Próximos <span class="accent">pasos</span></h1>
+    </div>
+
+    <!-- Un hito por paso de coreografía. Las tarjetas las arma el render. -->
+    <div class="hitos" id="hitos"></div>
+  </main>
+
+  <script>
+    (function(){
+      var P = window.PROCESO;
+
+      /* Sin datos no hay lámina. El mensaje es para quien edita proceso.js
+         (perfil no técnico), por eso dice el archivo y la causa, nada más. */
+      if (!P){
+        document.body.innerHTML =
+          '<div class="data-error">data/proceso.js no cargó o tiene un error de sintaxis</div>';
+        return;
+      }
+
+      var slide = document.getElementById('slide');
+      var meta  = P.meta || {};
+      var C     = P.conclusion || {};
+      var cliente = meta.empresaCorta || meta.empresa || 'el cliente';
+
+      document.title = 'Próximos pasos — Presentación de candidatos · ' + (meta.cargo || '');
+
+      /* ===== EL ESTÁNDAR =====
+         Es el proceso de Mandomedio y es igual en todos los cargos, así que
+         vive en la plantilla y no en los datos: un dato que nunca cambia sólo
+         se puede escribir mal. El único trozo variable es el nombre del
+         cliente, que sale de meta. */
+      var ESTANDAR = [
+        { titulo: "Entrevista en profundidad",
+          detalle: "El consultor a cargo entrevista a cada candidato para profundizar en su trayectoria, sus logros y su motivación por el cargo." },
+        { titulo: "Evaluación psicolaboral",
+          detalle: "Una psicóloga de Mandomedio aplica la evaluación y emite el informe de competencias de cada candidato." },
+        { titulo: "Entrevista con el cliente",
+          detalle: "Quienes avanzan se presentan al equipo de <b>" + cliente + "</b> para la decisión final." },
+      ];
+
+      // Un proceso puede sobrescribir el estándar declarando conclusion.pasos.
+      var HITOS = (Array.isArray(C.pasos) && C.pasos.length ? C.pasos : ESTANDAR).slice(0, 3);
+
+      var wrap = document.getElementById('hitos');
+      HITOS.forEach(function(h, i){
+        var card = document.createElement('div');
+        card.className = 'hito';
+
+        var n = document.createElement('span');
+        n.className = 'hito-n';
+        n.textContent = String(i + 1);
+
+        var titulo = document.createElement('p');
+        titulo.className = 'hito-titulo';
+        titulo.textContent = h.titulo || '';
+
+        var detalle = document.createElement('p');
+        detalle.className = 'hito-detalle';
+        detalle.innerHTML = h.detalle || '';
+
+        card.appendChild(n);
+        card.appendChild(titulo); card.appendChild(detalle);
+        wrap.appendChild(card);
+      });
+
+      /* ===== COREOGRAFÍA ===== un hito por flecha. */
+      var STEPS = ['s-h1','s-h2','s-h3'].slice(0, HITOS.length);
+      var DUR   = [0, 900, 900, 900];
+
+      var startAtEnd = new URLSearchParams(location.search).get('at') === 'end';
+      var idx = startAtEnd ? STEPS.length : 0;
+      var animating = false, animTimer = null;
+
+      if (startAtEnd){
+        slide.classList.add('no-anim');
+        STEPS.forEach(function(c){ slide.classList.add(c); });
+        slide.classList.add('play');
+        void slide.offsetWidth;
+        slide.classList.remove('no-anim');
+      } else {
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){ slide.classList.add('play'); });
+        });
+      }
+
+      function flush(){
+        clearTimeout(animTimer);
+        animating = false;
+        slide.classList.add('no-anim');
+        void slide.offsetWidth;
+        slide.classList.remove('no-anim');
+      }
+
+      window.deckStep = function(dir){
+        if (dir > 0){
+          if (animating) flush();
+          if (idx >= STEPS.length) return false;
+          slide.classList.add(STEPS[idx]);
+          idx++;
+          animating = true;
+          clearTimeout(animTimer);
+          animTimer = setTimeout(function(){ animating = false; }, DUR[idx] || 900);
+          return true;
+        }
+        if (dir < 0){
+          if (animating) flush();
+          if (idx <= 0) return false;
+          idx--;
+          slide.classList.add('no-anim');
+          slide.classList.remove(STEPS[idx]);
+          void slide.offsetWidth;
+          slide.classList.remove('no-anim');
+          return true;
+        }
+        return false;
+      };
+
+      // El teclado lo escucha _nav.js (único punto de entrada, ver perfil.html):
+      // un listener propio acá consumiría dos pasos por tecla.
+    })();
+  </script>
+</body>
+</html>

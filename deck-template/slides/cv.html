@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- El título real se arma en JS con el nombre del candidato + el cargo del
+     proceso; éste es sólo el fallback mientras no corre el script. -->
+<title>Currículum</title>
+<!-- Lámina de CV — maqueta EDITORIAL: en vez de tres tarjetas iguales, un
+     documento tipografiado. Encabezado protagonista (kicker Dongra + nombre
+     grande + bajada de títulos) cerrado por la línea peach que se dibuja; bajo
+     esa línea la trayectoria como ÍNDICE — rail angosto con el período a la
+     izquierda, cargo/empresa/viñetas a la derecha, filas separadas por
+     hairlines, sin cards; y al pie una franja con formación y pills.
+
+     La franja va ABAJO (y no bajo el encabezado) por dos razones: la bajada del
+     encabezado ya enumera los títulos, así que repetir formación
+     inmediatamente después sonaba a eco; y porque la trayectoria es el bloque
+     que crece con los datos (hasta 8 empleos, y scrollea si no caben) —
+     dejándola al medio, el pie queda anclado y el aire sobrante se reparte
+     entre las filas en vez de acumularse en un hueco.
+
+     SE REVELA TODO DE UNA: trayectoria, formación e idiomas/licencias/
+     herramientas aparecen juntos apenas se abre el CV — no hay que apretar
+     flechas para completarlo. (Antes eran 3 pasos controlados con ←/→; el
+     cliente pidió ver toda la información de inmediato, sin pasos.) Dentro
+     del CV, ← lo cierra y → no hace nada (no le queda ningún paso que
+     consumir). El encabezado y su línea entran con su propio fundido apenas
+     se monta la lámina; el resto entra un instante después, en cascada, pero
+     TODO junto, no por partes.
+     Todos los bloques ocupan su lugar en el layout desde el primer frame y
+     sólo cambian de opacidad: así nada se mueve durante la entrada. -->
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Los datos del proceso. Carga SÍNCRONA y con ruta relativa a propósito: así
+     el deck funciona abriendo los archivos con doble clic (file://), sin
+     servidor y sin fetch. -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- OJO con el href: Red Hat Display NO puede pedir el peso 500 (no existe en
+     el sistema de marca). Acá van 400/600/800; el 500 es exclusivo de Inter. -->
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== TEMA =====
+     Mismos tokens que perfil.html / insights.html: literales de marca fijos +
+     los que cambian por tema. Sobre navy sólo existen DOS tintas de texto —
+     blanco 100% y 72% — porque la jerarquía extra se hace con tamaño y peso,
+     no con una escalera de opacidades inventadas. Por eso `--body` y `--soft`
+     valen lo mismo en oscuro y sólo se separan en claro. */
+  :root{
+    --navy:#1E2D3B; --orange:#FD650D; --white:#FFFFFF;
+
+    --bg:#1E2D3B; --elev:#313E4B;
+    --ink:#FFFFFF;                       /* nombre, cargos */
+    --body:rgba(255,255,255,.72);        /* viñetas, formación */
+    --soft:rgba(255,255,255,.72);        /* rótulos y períodos */
+    --faint:rgba(255,255,255,.50);       /* duración del empleo: apoyo del período */
+    --hair:rgba(255,255,255,.12);        /* único borde de la lámina: 1px */
+    --peach:#FFAE7F;                     /* acento de TEXTO */
+    --rule:#FFAE7F;                      /* acento de LÍNEA */
+    --pill-bg:#313E4B; --pill-ink:#FFFFFF;
+
+    --rail:15%;                          /* ancho de la columna de períodos */
+
+    --ease:cubic-bezier(.22,1,.36,1);
+    --eoq:cubic-bezier(.23,1,.32,1);
+  }
+  /* En claro el peach no contrasta como tinta: el acento de TEXTO pasa al
+     naranjo profundo accesible (#B34A09) y el de LÍNEA al naranjo de marca
+     (#FD650D). El par accesible existe sólo para texto; los acentos y fondos
+     siguen usando #FD650D. */
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --elev:#F3F5F9;
+    --ink:#1E2D3B; --body:#333333; --soft:#717E8E; --faint:#9AA4B0;
+    --hair:#E8EAED;
+    --peach:#B34A09; --rule:#FD650D;
+    --pill-bg:#F3F5F9; --pill-ink:#1E2D3B;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:var(--bg); }
+  body{ font-family:"Inter",sans-serif; color:var(--body);
+    -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  /* La fluidez (clamp con vw/vh) es SÓLO del lienzo — padding exterior del
+     slide y tamaños de tipografía —, porque la lámina llena la ventana y el
+     deck no está clavado a 16:9. Todo padding/margin/gap INTERIOR es literal
+     de la escala 4/8/12/20/30/40/60/100, sin excepción.
+
+     PISO TIPOGRÁFICO (política del deck completo, 2026-08).
+     El iframe ocupa el viewport entero y NO se escala: un font-size de 10px se
+     dibuja de 10px reales, en el notebook y en el proyector. Por eso ningún
+     texto visible de esta lámina baja de 12px.
+     Y ojo con el TECHO, que es donde estaba el problema real: subir sólo el
+     piso de un clamp() no arregla nada, porque en pantalla grande manda el
+     tope. Un clamp(9.5px,1.25vh,10.5px) jamás pasaba de 10,5px por más que la
+     pantalla fuera de 4K. Cada vez que sube el piso, el techo sube en la misma
+     proporción — si no, el texto se sigue viendo chico justo donde se proyecta.
+     Los rangos por rol:
+       · micro-etiqueta / versalita (uppercase + letter-spacing) → 12 a 13-14px
+       · apoyo, glosa, metadato, período                        → 13 a 15-16px
+       · cuerpo, ítem de lista, viñeta                          → 14-15 a 17-18px
+     El padding-bottom reserva la banda del logo, que lo monta el shell abajo a
+     la izquierda (deck.html), no esta lámina. */
+  .slide{ position:relative; width:100vw; height:100vh; background:var(--bg);
+    display:flex; flex-direction:column; overflow:hidden;
+    padding:clamp(30px,4.5vh,52px) clamp(40px,5vw,80px) clamp(64px,9vh,84px); }
+
+  .inner{ flex:1 1 auto; min-height:0; width:100%; max-width:1140px; margin:0 auto;
+    display:flex; flex-direction:column; }
+
+  /* ===== ENCABEZADO — el protagonista de la lámina =====
+     Va a ancho completo (sin rail) para contrastar con el índice de abajo: el
+     documento abre ancho y después se ordena en dos columnas. */
+  .head{ flex:0 0 auto; }
+  .kicker{ font-family:"Dongra","Georgia","Times New Roman",serif; font-style:italic;
+    font-weight:400; font-size:clamp(15px,2.1vh,19px); line-height:1.25; color:var(--peach);
+    margin-bottom:4px;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .6s var(--ease), transform .6s var(--ease); }
+  .name{ font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(30px,4.8vh,50px); line-height:1.05; letter-spacing:-.02em; color:var(--ink);
+    opacity:0; transform:translateY(12px);
+    transition:opacity .6s var(--ease), transform .6s var(--ease); }
+  .lede{ margin-top:8px; max-width:72ch;
+    font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(13px,1.9vh,16px); line-height:1.4; color:var(--body);
+    opacity:0; transform:translateY(10px);
+    transition:opacity .6s var(--ease), transform .6s var(--ease); }
+
+  /* Línea de cierre del encabezado: se dibuja de izquierda a derecha, igual
+     que el divisor del deck (la econ-rule de perfil.html). Es un divisor de
+     bloque, no una barra de acento pegada a una card. */
+  .rule{ flex:0 0 auto; height:2px; background:var(--rule); margin-top:20px;
+    transform:scaleX(0); transform-origin:left;
+    transition:transform .6s var(--ease); }
+
+  /* ===== TRAYECTORIA — índice editorial =====
+     Ocupa el alto sobrante: las filas crecen y reparten el aire entre ellas en
+     vez de dejar un hueco muerto arriba o abajo. */
+  /* El índice SCROLLEA cuando no cabe. Antes era overflow:hidden y la última
+     fila simplemente se recortaba por abajo — con una trayectoria larga eso
+     significaba esconder empleos sin avisar. Ahora el bloque conserva su alto
+     (nunca se derrama sobre el pie) pero el contenido que sobra queda alcanzable.
+     `flex:1 0 auto` en las filas sigue repartiendo el aire cuando SÍ caben: con
+     2 o 3 empleos la lámina se ve igual que siempre, sin barra.
+     overscroll-behavior:contain evita que al llegar al final el scroll se lo
+     lleve la lámina de atrás. */
+  .track{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    display:flex; flex-direction:column;
+
+    /* Tipografía de la fila, parametrizada para el modo compacto de abajo.
+       Organización y viñeta comparten tamaño a propósito, igual que antes: la
+       jerarquía entre esas dos la hace el peso y la tinta (Inter 500 --soft vs
+       Red Hat 400 --body), no el cuerpo. El cargo sí queda un escalón arriba.
+       Lo que crece acá no aprieta nada: .track scrollea, así que con una
+       trayectoria larga simplemente hay más scroll. */
+    --e-cargo:clamp(17px,2.3vh,20px);
+    --e-org:clamp(14px,1.9vh,16px);
+    --e-bullet:clamp(14px,1.9vh,16px);
+    --e-pad:12px; }
+
+  /* Con cuatro empleos × dos viñetas el aire del caso normal no cabe en
+     pantallas de 720-810px de alto. `.dense` (lo pone el render cuando hay 4)
+     baja un escalón la tipografía de la fila y el padding de 12 a 8 — ambos
+     valores de la escala. Es la ÚNICA variación por cantidad de datos: con 2 o
+     3 empleos la lámina usa el aire completo.
+     Desde que .track scrollea, el modo compacto dejó de ser el que evita que se
+     pierdan empleos: ahora sólo ahorra un poco de scroll. Por eso baja el TECHO
+     y el padding, pero el PISO no cruza la política — 15px el cargo y 14px el
+     resto, igual que en el modo normal. Apretar a 11px para ganar dos filas era
+     exactamente el trato que hacía ilegible la lámina proyectada. */
+  .track.dense{
+    --e-cargo:clamp(15px,2.05vh,18px);
+    --e-org:clamp(14px,1.75vh,15px);
+    --e-bullet:clamp(14px,1.75vh,15px);
+    --e-pad:8px; }
+
+  /* Desvanecido en los bordes del índice. Sin esto la fila a medio scrollear
+     queda cortada a filo contra la línea del encabezado y se lee como un error
+     de render, no como "hay más abajo". Es una MÁSCARA (recorta lo que ya está
+     pintado), no un degradado decorativo de los que el brandbook prohíbe.
+     Los dos bordes se encienden por separado desde el JS: arriba sólo si ya se
+     bajó, abajo sólo si queda algo por ver. Con ambos en 0 la máscara es
+     opaca de punta a punta, así que una trayectoria corta no la nota. */
+  .track{ --fade-top:0px; --fade-bot:0px;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fade-top),
+                                       #000 calc(100% - var(--fade-bot)), transparent 100%);
+            mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fade-top),
+                                       #000 calc(100% - var(--fade-bot)), transparent 100%); }
+
+  /* Sin barra de scroll: en una lámina proyectada es cromo de aplicación, no de
+     documento. El aviso de que hay más queda a cargo de los bordes
+     desvanecidos de arriba — que es exactamente para lo que están. */
+  .track{ scrollbar-width:none; }
+  .track::-webkit-scrollbar{ display:none; }
+
+  /* Rótulo de sección en Inter 500, el mismo de perfil.html e insights.html:
+     es la voz de rótulo del deck y esta lámina tiene que leerse hermana. Inter
+     600 acá sería FAIL — ese peso existe sólo para la pill formal. */
+  /* Versalita: el letter-spacing de 1.5px la hace ver aún más chica de lo que
+     mide, así que va al piso de 12px con techo 13 (rango de micro-etiqueta). */
+  .label{ font-family:"Inter",sans-serif; font-weight:500;
+    font-size:clamp(12px,1.6vh,13px); line-height:1.3;
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--soft); }
+  .rubric{ flex:0 0 auto; margin:20px 0 4px;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .6s var(--eoq), transform .6s var(--eoq); }
+
+  /* Fila = banda: crece (flex-grow) para repartir el sobrante y centra su
+     contenido dentro de la banda, así el hairline queda a la misma distancia
+     arriba y abajo. NO encoge (flex-shrink 0): antes que apretar dos filas
+     hasta pisarse, la última se recorta por abajo. */
+  .entry{ flex:1 0 auto; display:flex; flex-direction:column; justify-content:center;
+    padding:var(--e-pad) 0;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .6s var(--eoq), transform .6s var(--eoq); }
+  .entry + .entry{ border-top:1px solid var(--hair); }
+
+  /* baseline alinea el período con la primera línea del cargo: ése es el
+     "renglón" que hace de guía de lectura en el rail. */
+  .entry-row{ display:flex; gap:30px; align-items:baseline; }
+
+  .when{ flex:0 0 var(--rail); min-width:0; }
+  /* El período es metadato, pero es lo que la clienta busca primero al barrer
+     el rail: rango de apoyo (13 → 15). */
+  .period{ font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(13px,1.75vh,15px);
+    line-height:1.3; color:var(--soft); font-variant-numeric:tabular-nums; }
+  /* El cargo vigente es lo primero que pregunta la clienta: su período va en
+     acento y lleva rótulo propio. Sin cromado — la marca es tipográfica. */
+  .entry.now .period{ color:var(--peach); }
+  /* Era el texto más chico de todo el deck (techo 10,5px: ni en un 4K crecía).
+     Sube a micro-etiqueta 12 → 13, y sigue quedando por debajo del período
+     (13 → 15), que es la jerarquía que tenía. */
+  /* Cuánto duró el empleo: va bajo el rango, un escalón más abajo en tinta.
+     El rail es angosto y "Ago 2010 — Mar 2017" ya lo llena, así que en la misma
+     línea no cabe. No toma el acento del cargo vigente: el protagonista de esa
+     entrada es el período, no su duración. */
+  .dur{ margin-top:3px; font-family:"Inter",sans-serif; font-weight:400;
+    font-size:clamp(12px,1.6vh,13.5px); line-height:1.3; color:var(--faint); }
+  .mark{ margin-top:4px; font-family:"Inter",sans-serif; font-weight:500;
+    font-size:clamp(12px,1.6vh,13px); line-height:1.3;
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--peach); }
+
+  .what{ flex:1 1 auto; min-width:0; }
+  .cargo{ font-family:"Red Hat Display",sans-serif; font-weight:600;
+    font-size:var(--e-cargo); line-height:1.25; letter-spacing:-.01em; color:var(--ink); }
+  .org{ margin-top:4px; font-family:"Inter",sans-serif; font-weight:500;
+    font-size:var(--e-org); line-height:1.4; color:var(--soft); }
+  .bullets{ list-style:none; margin-top:12px;
+    display:flex; flex-direction:column; gap:4px; }
+  .bullets li{ position:relative; padding-left:12px;
+    font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:var(--e-bullet); line-height:1.45; color:var(--body); }
+  .bullets li::before{ content:"–"; position:absolute; left:0; top:0; color:var(--soft); }
+
+  /* ===== PIE — formación y pills =====
+     Franja aparte, separada de la trayectoria por un hairline a todo el ancho.
+     Reusa el mismo rail que el índice: los dos rótulos caen en la columna de
+     los períodos, así la lámina entera se lee sobre un solo eje vertical. */
+  /* El aire entre las dos filas va por `gap` y no por margen: si una de las dos
+     se apaga por falta de datos, el gap desaparece con ella — un margen de
+     hermano adyacente, no. */
+  .foot{ flex:0 0 auto; margin-top:20px; padding-top:20px; border-top:1px solid var(--hair);
+    display:flex; flex-direction:column; gap:20px;
+    opacity:0; transition:opacity .6s var(--eoq); }
+  .foot-row{ display:flex; gap:30px; align-items:baseline;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .6s var(--eoq), transform .6s var(--eoq); }
+  .foot-label{ flex:0 0 var(--rail); min-width:0; }
+  .foot-body{ flex:1 1 auto; min-width:0; }
+
+  /* Un grado por línea: "Título · Institución", con la institución en tinta
+     secundaria. Aguanta 1, 2 o 3 formaciones sin cambiar de estructura. */
+  .edu{ list-style:none; display:flex; flex-direction:column; gap:4px; }
+  /* Ítem de lista → rango de cuerpo (14 → 17). Esto sí vive en el bloque FIJO
+     del pie: con 3 formaciones el pie crece ~8px respecto de antes, holgura que
+     el alto disponible absorbe sin problema (ver cálculo en el commit). */
+  .edu li{ font-family:"Red Hat Display",sans-serif; font-weight:600;
+    font-size:clamp(14px,1.95vh,17px); line-height:1.4; color:var(--ink); }
+  .edu .inst{ font-weight:400; color:var(--body); }
+
+  /* Pill formal: es el único lugar de la lámina con Inter 600, y el único con
+     radio 9999. Sin borde, para no montar un doble contorno sobre el fondo. */
+  .pills{ display:flex; flex-wrap:wrap; gap:8px; }
+  /* La pill no es una etiqueta decorativa: dice "Inglés avanzado", "SAP HCM" —
+     es dato que se lee. Va al rango de apoyo (13 → 15). El padding 4/12 y el
+     radio 9999 no se tocan. */
+  .pill{ font-family:"Inter",sans-serif; font-weight:600;
+    font-size:clamp(13px,1.75vh,15px); line-height:1.3;
+    color:var(--pill-ink); background:var(--pill-bg);
+    border-radius:9999px; padding:4px 12px; }
+
+  /* ===== Coreografía =====
+     Al llegar a la lámina (.play) entra sólo el encabezado con su línea: es la
+     portada del candidato. Los tres bloques de contenido los abre quien
+     presenta, con →. Las clases de paso se ponen sobre .slide y son
+     ACUMULATIVAS: retroceder quita la última y el bloque se apaga. */
+  .play .kicker{ opacity:1; transform:none; transition-delay:.10s; }
+  .play .name{ opacity:1; transform:none; transition-delay:.18s; }
+  .play .lede{ opacity:1; transform:none; transition-delay:.28s; }
+  .play .rule{ transform:scaleX(1); transition-delay:.42s; }
+
+  /* Paso 1 · trayectoria. Los delays son CORTOS y relativos al paso, no a la
+     carga de la lámina: la cascada tiene que arrancar apenas se aprieta la
+     flecha. nth-of-TYPE y no nth-child porque el rótulo "Trayectoria" es el
+     primer hijo de .track y correría todo el escalonado un lugar; el n+4 cierra
+     la lista para que una fila extra herede el último delay en vez de quedarse
+     invisible. */
+  .s-tray .rubric{ opacity:1; transform:none; }
+  .s-tray .entry{ opacity:1; transform:none; }
+  .s-tray .entry:nth-of-type(1){ transition-delay:.08s; }
+  .s-tray .entry:nth-of-type(2){ transition-delay:.20s; }
+  .s-tray .entry:nth-of-type(3){ transition-delay:.32s; }
+  .s-tray .entry:nth-of-type(n+4){ transition-delay:.44s; }
+
+  /* Pasos 2 y 3 · la franja del pie. El hairline de la franja se enciende con
+     el PRIMERO de los dos pasos que exista — una línea divisoria sin nada
+     debajo se lee como un error de render, y si el candidato no trae formación
+     el primer paso del pie es el de las pills. */
+  .s-edu .foot, .s-pills .foot{ opacity:1; }
+  .s-edu .row-edu{ opacity:1; transform:none; transition-delay:.08s; }
+  .s-pills .row-pills{ opacity:1; transform:none; transition-delay:.08s; }
+
+  /* Se usa para pintar un estado de una sola vez: ?at=end al entrar
+     retrocediendo, y al deshacer un paso. */
+  .no-anim *, .no-anim *::before, .no-anim *::after{
+    transition:none !important; animation:none !important; }
+
+  /* En móvil el rail del 15% no da ancho útil: el período pasa a ser un
+     renglón sobre el cargo y las filas se leen apiladas. */
+  @media (max-width:767px){
+    .entry-row, .foot-row{ display:block; }
+    .when, .foot-label{ margin-bottom:4px; }
+    .foot-label{ margin-bottom:8px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+    .kicker,.name,.lede,.rubric,.entry,.foot,.foot-row{ opacity:1 !important; transform:none !important; }
+    .rule{ transform:scaleX(1) !important; }
+  }
+</style>
+</head>
+<body>
+  <!-- PLANTILLA de CV. Nada de esta lámina está escrito a mano: el candidato lo
+       elige la URL (?c=<índice> → PROCESO.candidatos[c]) y su contenido sale de
+       ese candidato.cv en data/proceso.js. Acá sólo se queda lo CONSTANTE del
+       formato: el kicker "Currículum" y los tres rótulos de sección. -->
+  <main class="slide" id="slide">
+    <div class="inner">
+      <header class="head">
+        <p class="kicker">Currículum</p>
+        <h1 class="name" id="nombre"></h1>
+        <p class="lede" id="lede"></p>
+      </header>
+
+      <!-- Divisor decorativo: cierra el encabezado y abre el índice. -->
+      <div class="rule" aria-hidden="true"></div>
+
+      <section class="track" id="track">
+        <!-- "Destacada", no "cronológica": el orden lo decide quien arma el
+             proceso (puede priorizar lo pertinente al cargo por sobre lo más
+             reciente), así que la lámina no promete una línea de tiempo. -->
+        <p class="label rubric" id="rubric">Trayectoria destacada</p>
+        <!-- Las filas .entry las inserta el render, después de este rótulo. -->
+      </section>
+
+      <footer class="foot" id="foot">
+        <div class="foot-row row-edu" id="rowEdu">
+          <p class="label foot-label">Formación</p>
+          <div class="foot-body"><ul class="edu" id="edu"></ul></div>
+        </div>
+        <div class="foot-row row-pills" id="rowPills">
+          <p class="label foot-label">Idiomas, licencias y herramientas</p>
+          <div class="foot-body"><div class="pills" id="pills"></div></div>
+        </div>
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      // Si algo del dato falla, la lámina no se pinta a medias: se reemplaza
+      // por un aviso legible. Quien arma el deck no es técnica.
+      function fatal(msg){
+        document.body.innerHTML = '';
+        var box = document.createElement('div');
+        box.setAttribute('style', 'display:flex; align-items:center; justify-content:center;'
+          + ' height:100%; padding:40px; text-align:center; background:var(--bg);'
+          + ' font-family:"Inter",sans-serif; font-size:15px; line-height:1.5; color:var(--body);');
+        box.textContent = msg;
+        document.body.appendChild(box);
+      }
+
+      var P = window.PROCESO;
+      if (!P) { fatal('data/proceso.js no cargó o tiene un error de sintaxis'); return; }
+
+      var c = parseInt(new URLSearchParams(location.search).get('c'), 10);
+      if (isNaN(c)) c = 0;                       // sin ?c= → el primer candidato
+      var cand = (P.candidatos || [])[c];
+      if (!cand) { fatal('No existe el candidato ' + c + ' en data/proceso.js'); return; }
+      if (!cand.cv) { fatal('A ' + (cand.nombre || 'este candidato') + ' le falta el bloque “cv” en data/proceso.js'); return; }
+
+      var cv = cand.cv;
+
+      function el(tag, cls, txt){
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (txt != null) n.textContent = txt;    // todo el CV es texto plano: nada de innerHTML
+        return n;
+      }
+
+      // ---- Render. Corre ANTES de que arranque la coreografía: las clases de
+      // entrada tienen que ver el DOM ya completo.
+      var cargo = (P.meta && P.meta.cargo) || '';
+      document.title = 'Currículum — ' + cand.nombre + (cargo ? ' · ' + cargo : '');
+
+      document.getElementById('nombre').textContent = cand.nombre;
+      document.getElementById('lede').textContent = cv.lede || '';
+
+      /* -- Trayectoria --
+         Tope de 8 empleos (el límite del SCHEMA). Antes eran 4, que era lo que
+         cabía en el alto de la lámina; desde que el bloque scrollea, el tope ya
+         no lo pone el alto sino hasta dónde el índice sigue leyéndose como
+         índice y no como un CV completo pegado adentro. */
+      var track = document.getElementById('track');
+      /* La trayectoria se muestra SIEMPRE del cargo más reciente al más
+         antiguo, sin depender de en qué orden la haya escrito quien armó los
+         datos: lo primero que se lee tiene que ser dónde está hoy.
+         Se ordena por la fecha de INICIO (el trozo antes del guion largo). El
+         fin no sirve de criterio porque el cargo vigente dice "Presente". */
+      var MESES = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5,
+                    jul:6, ago:7, sep:8, oct:9, nov:10, dic:11 };
+      function inicio(periodo){
+        var txt = String(periodo || '').split('—')[0]
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');   // saca tildes: "díc" → "dic"
+        var anio = txt.match(/\d{4}/);
+        if (!anio) return null;                                 // sin año no se puede ubicar
+        var mes = 0;
+        for (var m in MESES){ if (txt.indexOf(m) !== -1){ mes = MESES[m]; break; } }
+        return Number(anio[0]) * 12 + mes;
+      }
+      // Las filas sin fecha reconocible NO se reordenan entre ellas y quedan al
+      // final: inventarles una posición sería peor que dejarlas donde están.
+      var conFecha = [], sinFecha = [];
+      (cv.trayectoria || []).forEach(function(j){
+        (inicio(j.periodo) === null ? sinFecha : conFecha).push(j);
+      });
+      conFecha.sort(function(a, b){ return inicio(b.periodo) - inicio(a.periodo); });
+
+      // El tope subió de 4 a 8 ahora que el índice scrollea: 4 obligaba a
+      // esconder empleos de una carrera larga. Sigue habiendo tope porque una
+      // trayectoria de quince cargos no es un CV para el cliente, es un volcado.
+      // Se recorta DESPUÉS de ordenar: lo que se cae es lo más antiguo.
+      var trayectoria = conFecha.concat(sinFecha).slice(0, 8);
+
+      // El cargo vigente se deduce del PERÍODO ("… — Presente"), que es dato
+      // del CV; nunca de la posición en la lista, porque el orden es editorial.
+      // El rótulo, en cambio, lo manda `trabajando` del screening — es la
+      // fuente más reciente y la que usa la lámina de perfil ("· en ejercicio"
+      // / "· último cargo"). Sin período no hay marca: no se inventa.
+      var VIGENTE = /presente|actual|a la fecha|hoy/i;
+      var rotuloVigente = (cand.trabajando === false) ? 'Último cargo' : 'En ejercicio';
+
+      trayectoria.forEach(function(j){
+        var periodo = j.periodo || '';
+        var vigente = VIGENTE.test(periodo);
+
+        var entry = el('article', 'entry' + (vigente ? ' now' : ''));
+        var row   = el('div', 'entry-row');
+
+        var when = el('div', 'when');
+        when.appendChild(el('p', 'period', periodo));
+        /* Cuánto duró ese empleo, bajo el rango. Viene YA ESCRITO en los datos
+           (ver SCHEMA.md): la lámina no calcula fechas. Dos razones — los
+           períodos que sólo traen año no se pueden calcular exacto y ahí el
+           dato dice "aprox. 3 años", y el cargo vigente crecería solo con el
+           paso del tiempo, cuando el deck es una foto de su fecha de
+           presentación. */
+        if (j.duracion) when.appendChild(el('p', 'dur', j.duracion));
+        if (vigente) when.appendChild(el('p', 'mark', rotuloVigente));
+
+        var what = el('div', 'what');
+        what.appendChild(el('h2', 'cargo', j.cargo));
+        if (j.org) what.appendChild(el('p', 'org', j.org));
+        // Sin viñetas no se monta el <ul>: vacío igual sumaría su margen.
+        if (j.bullets && j.bullets.length){
+          var ul = el('ul', 'bullets');
+          j.bullets.forEach(function(b){ ul.appendChild(el('li', null, b)); });
+          what.appendChild(ul);
+        }
+
+        row.appendChild(when);
+        row.appendChild(what);
+        entry.appendChild(row);
+        track.appendChild(entry);
+      });
+
+      // Modo compacto: ver el bloque `.track.dense` del CSS.
+      if (trayectoria.length >= 4) track.classList.add('dense');
+
+      // Bordes desvanecidos del índice, según dónde esté el scroll. Se recalcula
+      // al deslizar y al cambiar el tamaño de la ventana, porque el alto útil
+      // depende del alto de la lámina: la misma trayectoria scrollea en un
+      // notebook y no scrollea en un proyector.
+      function pintarBordes(){
+        var sobra = track.scrollHeight - track.clientHeight;
+        track.style.setProperty('--fade-top', track.scrollTop > 2 ? '18px' : '0px');
+        track.style.setProperty('--fade-bot', track.scrollTop < sobra - 2 ? '18px' : '0px');
+      }
+      track.addEventListener('scroll', pintarBordes);
+      window.addEventListener('resize', pintarBordes);
+      requestAnimationFrame(pintarBordes);
+      // Sin empleos no se anuncia una sección vacía.
+      if (!trayectoria.length) document.getElementById('rubric').style.display = 'none';
+
+      /* -- Pie: formación (máx 3) y pills (máx 6), los topes del SCHEMA -- */
+      var edu = document.getElementById('edu');
+      var formacion = (cv.formacion || []).slice(0, 3);
+      formacion.forEach(function(f){
+        // El espacio va en el grado y no en el <span>: así la institución puede
+        // quebrar de línea sin arrastrar un blanco al principio del renglón.
+        var grado = f.grado || '';
+        var li = el('li', null, f.institucion ? grado + ' ' : grado);
+        if (f.institucion) li.appendChild(el('span', 'inst', '· ' + f.institucion));
+        edu.appendChild(li);
+      });
+
+      var pillsEl = document.getElementById('pills');
+      var pills = (cv.pills || []).slice(0, 6);
+      pills.forEach(function(p){ pillsEl.appendChild(el('span', 'pill', p)); });
+
+      // Cada fila del pie se apaga sola si no trae datos, y si no queda
+      // ninguna se apaga la franja entera — junto con su hairline, que si no
+      // quedaría flotando como una línea sin contenido debajo.
+      if (!formacion.length) document.getElementById('rowEdu').style.display = 'none';
+      if (!pills.length) document.getElementById('rowPills').style.display = 'none';
+      if (!formacion.length && !pills.length) document.getElementById('foot').style.display = 'none';
+
+      /* ===== Revelado (todo junto, sin pasos) =====
+         STEPS se arma igual que antes con lo que el candidato TRAE (un
+         bloque sin datos no genera su clase), pero ahora las tres se
+         encienden A LA VEZ apenas se abre el CV — el cliente pidió ver toda
+         la información de una, no ir revelándola con flechas. */
+      var STEPS = [];
+      if (trayectoria.length) STEPS.push('s-tray');
+      if (formacion.length)   STEPS.push('s-edu');
+      if (pills.length)       STEPS.push('s-pills');
+
+      var slide = document.getElementById('slide');
+      // ?at=end → el shell entró a esta lámina retrocediendo: se pinta
+      // completa y sin animar. Como ahora TODO se muestra siempre completo,
+      // la única diferencia entre las dos ramas es si hay animación de
+      // entrada o no.
+      var startAtEnd = new URLSearchParams(location.search).get('at') === 'end';
+
+      if (startAtEnd){
+        slide.classList.add('no-anim', 'play');
+        STEPS.forEach(function(s){ slide.classList.add(s); });
+        void slide.offsetWidth;                  // fija el estado final sin animar
+        slide.classList.remove('no-anim');
+      } else {
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){
+            slide.classList.add('play');
+            STEPS.forEach(function(s){ slide.classList.add(s); });
+          });
+        });
+      }
+
+      // Sin pasos que consumir: la lámina ya no tiene coreografía por
+      // flecha. Devuelve false siempre, así _nav.js le avisa al shell que no
+      // hay nada que hacer — dentro del CV, → no hace nada y ← lo cierra
+      // (lo maneja deck.html, ver move()).
+      window.deckStep = function(){ return false; };
+    })();
+  </script>
+</body>
+</html>

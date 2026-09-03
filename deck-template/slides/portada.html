@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- El título real se arma desde PROCESO.meta.cargo; este es el fallback si el
+     JS no alcanza a correr. -->
+<title>Portada — Presentación de candidatos</title>
+<!-- v2 — feedback: usar como referencia la portada del deck-consolidado de
+     opciones-narrativa (LAB/Semana 5): fondo blanco, isotipo grande a la
+     derecha con halo naranjo en pulsos, kicker, título gigante con palabra
+     acentuada en naranjo, fila de "pilares" separados por · y meta uppercase.
+     Adaptación: los pilares son los nombres de los candidatos presentados. -->
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Datos del proceso. Carga SÍNCRONA y antes del render: define window.PROCESO
+     y funciona por file:// (no es módulo, no hace fetch). -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== TEMA ===== literales de marca + tokens que cambian por tema. */
+  :root{
+    --navy:#1E2D3B; --orange:#FD650D; --peach:#FFAE7F; --white:#FFFFFF;
+
+    --bg:#FFFFFF; --heading:#1E2D3B;
+    --kicker:#FD650D;                    /* el kicker Dongra: naranjo sobre claro */
+    --body:#333333; --sec:#717E8E; --muted:#A8B0BA;
+
+    --ease:cubic-bezier(.22,1,.36,1);
+    /* mismo valor en ambos lados: margen del texto (izq) = margen del isotipo (der) */
+    --edge-x:19%;
+  }
+  :root[data-theme="dark"]{
+    --bg:#1E2D3B; --heading:#FFFFFF;
+    --kicker:#FFAE7F;                    /* sobre navy el naranjo vibra: pasa a peach */
+    --body:rgba(255,255,255,.80); --sec:rgba(255,255,255,.70); --muted:rgba(255,255,255,.45);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:var(--bg); }
+  body{ font-family:"Inter",sans-serif; color:var(--body); -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  .slide{ position:relative; width:100vw; height:100vh; background:var(--bg);
+    display:flex; flex-direction:column; justify-content:center;
+    padding:clamp(40px,5vw,80px) var(--edge-x); overflow:hidden; }
+
+  /* ===== Isotipo grande a la derecha con halo naranjo en pulsos ===== */
+  .cover-iso{ position:absolute; right:var(--edge-x); top:50%; transform:translateY(-50%);
+    width:clamp(190px,24vw,330px); height:clamp(190px,24vw,330px);
+    display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:1;
+    opacity:0; transition:opacity .9s var(--ease); transition-delay:.55s; }
+  .play .cover-iso{ opacity:1; }
+  .cover-iso .iso-mark{ position:relative; z-index:2; width:52%; height:52%; display:block;
+    filter:drop-shadow(0 0 18px rgba(253,101,13,.4)); }
+  .cover-iso .pulse{ position:absolute; left:50%; top:50%; width:52%; height:52%; border-radius:9999px;
+    border:1px solid rgba(253,101,13,.55); opacity:0; transform:translate(-50%,-50%) scale(1); }
+  /* v3: 2.8s→5s. v4: 7.5s, anillo a scale 4.2. v6 — feedback: seguía gatillando
+     muy seguido (un anillo nuevo cada 2.5s aunque cada uno dure 7.5s) → sube a
+     12s por pulso y el stagger a 4s, y el anillo se adelgaza (2px→1px). */
+  .play .cover-iso .pulse{ animation:isopulse 12s cubic-bezier(.08,.8,.22,1) infinite; }
+  .play .cover-iso .pulse:nth-child(2){ animation-delay:4s; }
+  .play .cover-iso .pulse:nth-child(3){ animation-delay:8s; }
+  @keyframes isopulse{
+    0%{ transform:translate(-50%,-50%) scale(1); opacity:.65; }
+    100%{ transform:translate(-50%,-50%) scale(4.2); opacity:0; }
+  }
+
+  /* ===== Contenido ===== */
+  /* container-type: el tamaño de letra de abajo se ajusta al ancho REAL de este
+     bloque (cqw), no al viewport crudo (vw) — así, si el margen --edge-x crece
+     y la columna se angosta, la letra se achica en la misma proporción y el
+     título nunca se ve apretado ni se pasa de 2 líneas, sea cual sea el margen. */
+  .inner{ position:relative; z-index:2; max-width:62%; container-type:inline-size; }
+
+  .kicker{ font-family:"Dongra","Georgia","Times New Roman",serif; font-style:italic; font-weight:400;
+    font-size:clamp(16px,3.6cqw,26px); color:var(--kicker); }
+
+  .cover-title{ font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(34px,11.5cqw,78px); line-height:1.05; letter-spacing:-.02em;
+    color:var(--heading); margin-top:20px; }   /* 16 no está en la escala 4/8/12/20/30/40 */
+  .cover-title .accent{ color:var(--orange); }
+
+  /* v3 — feedback: intercambiar empresa y candidatos — la empresa sube bajo el
+     título y se nota un poco más (navy, 600); los candidatos bajan a la línea
+     meta en letra más chica. */
+  .cover-org{ margin-top:30px; font-family:"Red Hat Display",sans-serif; font-weight:600;
+    font-size:clamp(14px,3.4cqw,23px); color:var(--heading); }
+
+  /* v5 — feedback: los nombres SIEMPRE en una sola fila; sean 3 o 8, se achica
+     la letra hasta que quepan. nowrap + auto-fit por JS (baja el font-size hasta
+     que el ancho real entra en el contenedor); el gap va en em para escalar
+     junto con la letra.
+     v7 — legibilidad: era 13 px FIJO, o sea que en un proyector 4K seguía
+     midiendo 13 px reales. Ahora es un clamp en cqw (crece con el ancho de
+     .inner) y el auto-fit parte de ese valor en vez de partir siempre en 13.
+     El piso del auto-fit sube de 8 px a 12 px: bajo eso el nombre no se lee
+     proyectado, y si ni así entra, la fila se parte en dos líneas (ver JS). */
+  .cover-meta{ display:flex; flex-wrap:nowrap; white-space:nowrap; align-items:center; gap:.9em;
+    font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(13px,2.2cqw,16px);
+    letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-top:40px; }
+  .cover-meta .sep{ color:rgba(253,101,13,.35); font-weight:700; }
+
+  /* v5 — feedback: la fecha va abajo a la derecha, en la esquina, pequeña,
+     que apenas se note. v7: 10 px fijos eran ilegibles proyectados; queda como
+     versalita chica (12→13.5) — sigue siendo el texto más discreto de la
+     lámina por opacidad y color, no por tamaño. */
+  .cover-date{ position:absolute; right:clamp(40px,5vw,80px); bottom:clamp(30px,4vh,40px);
+    font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(12px,1.3vh,13.5px);
+    letter-spacing:.14em; text-transform:uppercase; color:var(--muted); opacity:.6; z-index:2; }
+
+  /* ===== Entrada ===== */
+  .kicker, .cover-title, .cover-org, .cover-meta, .cover-date{
+    opacity:0; transform:translateY(16px);
+    transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .play .kicker{ opacity:1; transform:none; transition-delay:.10s; }
+  .play .cover-title{ opacity:1; transform:none; transition-delay:.25s; }
+  .play .cover-org{ opacity:1; transform:none; transition-delay:.55s; }
+  .play .cover-meta{ opacity:1; transform:none; transition-delay:.75s; }
+  .play .cover-date{ opacity:.6; transform:none; transition-delay:.90s; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+    .kicker,.cover-title,.cover-org,.cover-meta,.cover-date,.cover-iso{ opacity:1 !important; transform:none !important; }
+    .cover-iso{ transform:translateY(-50%) !important; }
+    .cover-iso .pulse{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="mm-iso" viewBox="0 0 162.12 162.12">
+      <circle fill="#FD650D" cx="81.06" cy="81.06" r="81.06"/>
+      <g fill="#FFFFFF">
+        <circle cx="29.51" cy="102.6" r="19.33"/>
+        <path d="M53.88,29.01l-21,36.37,32.56,48.23c3.65,5.41,9.61,8.33,15.68,8.33,3.64,0,7.32-1.05,10.56-3.24,8.65-5.84,10.93-17.59,5.09-26.24l-42.89-63.45Z"/>
+        <path d="M106.94,29.01l-21,36.37,32.56,48.23c3.65,5.41,9.61,8.33,15.68,8.33,3.64,0,7.32-1.05,10.56-3.24,8.65-5.84,10.93-17.59,5.09-26.24l-42.89-63.45Z"/>
+      </g>
+    </symbol>
+  </svg>
+
+  <!-- El único texto fijo de esta lámina es el kicker; título, empresa, fila de
+       nombres y fecha se pueblan desde PROCESO (ver el script del final). -->
+  <main class="slide" id="slide">
+    <div class="cover-iso" aria-hidden="true">
+      <span class="pulse"></span><span class="pulse"></span><span class="pulse"></span>
+      <svg class="iso-mark" viewBox="0 0 162.12 162.12"><use href="#mm-iso"/></svg>
+    </div>
+    <div class="inner">
+      <div class="kicker">Presentación de candidatos</div>
+      <h1 class="cover-title"></h1>
+      <div class="cover-org"></div>
+      <div class="cover-meta"></div>
+    </div>
+    <div class="cover-date"></div>
+  </main>
+
+  <script>
+    (function(){
+      var P = window.PROCESO;
+
+      // Sin datos no hay lámina: se muestra un aviso legible en vez de una
+      // portada en blanco. Suele ser una coma o una comilla mal cerrada en
+      // data/proceso.js.
+      if (!P){
+        document.body.innerHTML =
+          '<div style="padding:60px;font-size:18px;line-height:1.5;color:var(--body)">' +
+          'No se pudo mostrar esta lámina: <b>data/proceso.js no cargó o tiene un error de sintaxis</b>.' +
+          '</div>';
+        return;
+      }
+
+      var meta = P.meta || {};
+      var candidatos = P.candidatos || [];
+
+      document.title = 'Portada — Presentación de candidatos · ' + (meta.cargo || '');
+
+      // ---- Título: el cargo, con la subcadena meta.cargoAccent en naranjo.
+      // Se arma con nodos de texto (no innerHTML) para que un cargo con & o <
+      // no rompa el markup. Si cargoAccent no viene o no aparece en el cargo,
+      // el título va entero en color heading.
+      var h1 = document.querySelector('.cover-title');
+      var cargo = String(meta.cargo || '');
+      var acento = meta.cargoAccent ? String(meta.cargoAccent) : '';
+      var corte = acento ? cargo.indexOf(acento) : -1;
+      var punto = /\.$/.test(cargo) ? '' : '.';   // no duplicar el punto si ya viene escrito
+      if (corte >= 0){
+        var span = document.createElement('span');
+        span.className = 'accent';
+        span.textContent = acento;
+        h1.appendChild(document.createTextNode(cargo.slice(0, corte)));
+        h1.appendChild(span);
+        h1.appendChild(document.createTextNode(cargo.slice(corte + acento.length) + punto));
+      } else {
+        h1.textContent = cargo + punto;
+      }
+
+      document.querySelector('.cover-org').textContent = meta.empresa || '';
+      document.querySelector('.cover-date').textContent = meta.fecha || '';
+
+      // ---- Fila de nombres: el `pila` de cada candidato, en el orden de
+      // PROCESO.candidatos, con el separador · entre medio (nunca al final).
+      // Sin espacios en blanco entre spans: la separación la da el gap del flex.
+      var fila = document.querySelector('.cover-meta');
+      candidatos.forEach(function(c, i){
+        if (i){
+          var sep = document.createElement('span');
+          sep.className = 'sep';
+          sep.textContent = '·';
+          fila.appendChild(sep);
+        }
+        var nombre = document.createElement('span');
+        nombre.textContent = c.pila || c.nombre || '';
+        fila.appendChild(nombre);
+      });
+
+      // ---- Coreografía: arranca recién con el DOM ya construido arriba.
+      var slide = document.getElementById('slide');
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){ slide.classList.add('play'); });
+      });
+
+      // Auto-fit de la fila de nombres: baja el font-size hasta que TODOS quepan
+      // en UNA sola línea. Corre al cargar las fuentes y al resize.
+      //
+      // El piso es 12 px, no 8: la portada se proyecta a pantalla completa y sin
+      // escalado, así que 8 px son 8 px reales en la pared — no se leen. Y el
+      // punto de partida ya no es un 13 duro: se lee el clamp del CSS, que crece
+      // con el ancho de .inner, para que en pantalla grande la fila también
+      // crezca (antes el techo fijo de 13 px era justamente el problema).
+      var META_MIN = 12;
+      function fitNames(){
+        // Limpia lo que dejó la corrida anterior para volver a partir del clamp.
+        fila.style.fontSize = '';
+        fila.style.whiteSpace = '';
+        fila.style.flexWrap = '';
+        var fs = parseFloat(getComputedStyle(fila).fontSize) || 13;
+        while (fila.scrollWidth > fila.clientWidth && fs > META_MIN){
+          fs = Math.max(META_MIN, fs - 0.5);
+          fila.style.fontSize = fs + 'px';
+        }
+        // Si ni en el piso entra (muchos finalistas en una pantalla angosta),
+        // la fila se parte en dos líneas. Se prefiere eso a seguir achicando:
+        // un nombre de 9 px no se lee, y con nowrap se cortaría contra el borde.
+        if (fila.scrollWidth > fila.clientWidth){
+          fila.style.whiteSpace = 'normal';
+          fila.style.flexWrap = 'wrap';
+        }
+      }
+      if (document.fonts && document.fonts.ready){ document.fonts.ready.then(fitNames); }
+      else { fitNames(); }
+      window.addEventListener('resize', fitNames);
+
+      // Tuning en vivo: el harness de _tuner.html manda el margen por postMessage
+      // para ajustarlo con un slider sin recargar. No afecta el uso normal de la slide.
+      window.addEventListener('message', function(e){
+        if (e.data && e.data.type === 'set-edge-x'){
+          document.documentElement.style.setProperty('--edge-x', e.data.value);
+          fitNames();
+        }
+      });
+      var params = new URLSearchParams(location.search);
+      if (params.has('edge')){
+        document.documentElement.style.setProperty('--edge-x', params.get('edge') + '%');
+      }
+    })();
+  </script>
+</body>
+</html>

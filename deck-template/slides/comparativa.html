@@ -1,0 +1,650 @@
+<!--
+  Lámina COMPARATIVA — comparador de terna (interactivo).
+  Matriz DOM/SVG: una columna por candidato, una fila por criterio. Al elegir
+  2-3 candidatos, sus columnas se ensanchan y el resto se atenúa, con FLIP
+  (translateX + scaleX con contra-escala interna, para que el texto no se
+  deforme). Atajos: 1-9 alternan candidato, Esc/0 limpian. Acepta deep-link
+  ?sel=ester,javier para abrir una comparación ya armada.
+  DOM/SVG a propósito y no canvas: el texto queda seleccionable y accesible.
+
+  PLANTILLA: nada del contenido está escrito acá. Los candidatos, la escala de
+  renta y las filas variables salen de data/proceso.js (window.PROCESO); en
+  este archivo sólo vive lo constante: el título, las cuatro filas fijas de la
+  matriz, los textos de interfaz y el CSS. Funciona con 3 a 6 columnas.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comparativa — Presentación de candidatos</title>
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Los datos del proceso, en carga síncrona y por ruta relativa: así la lámina
+     abre igual desde el shell, desde file:// o con doble clic. -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@300;400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===== TEMA =====
+   Literales de marca fijos + tokens que cambian. `--surface` es el fondo de la
+   lámina y `--card` la superficie de la matriz (antes era `--white`, que en
+   oscuro habría quedado con nombre mentiroso). */
+:root{
+  --accent:#FD650D; --navy:#1E2D3B; --peach:#FFAE7F; --white:#FFFFFF;
+  --rhd:'Red Hat Display',sans-serif; --inter:'Inter',sans-serif;
+
+  --surface:#1E2D3B; --card:#313E4B; --zebra:#36434F; --chip:#3B4855;
+  --accent-txt:#FFAE7F;
+  --heading:#FFFFFF; --body:rgba(255,255,255,.80);
+  --sec:rgba(255,255,255,.70); --muted:rgba(255,255,255,.45);
+  --border:rgba(255,255,255,.12); --border-2:rgba(255,255,255,.28);
+  --pos:#7BE0A3; --pos-bg:rgba(123,224,163,.14);
+  --bar-track:rgba(255,255,255,.14);
+}
+:root[data-theme="light"]{
+  --surface:#F3F5F9; --card:#FFFFFF; --zebra:#FAFBFC; --chip:#F3F5F9;
+  --accent-txt:#B34A09;
+  --heading:#1E2D3B; --body:#333333;
+  --sec:#717E8E; --muted:#A8B0BA;
+  --border:#E8EAED; --border-2:#D5D8DC;
+  --pos:#15803D; --pos-bg:rgba(34,197,94,.12);
+  --bar-track:#E8EAED;
+}
+/* ===== PISO TIPOGRÁFICO (12 px) =====
+   Esta lámina se proyecta a pantalla completa y el iframe NO escala: un
+   `font-size:10px` se dibuja de 10 px reales, se lea a un metro o a seis. Por
+   eso ningún texto visible baja de 12 px.
+
+   Ojo con el TECHO del clamp: era él —no el piso— el que dejaba el texto chico
+   en pantalla grande. Un `clamp(9.5px,1.3vh,10.5px)` nunca pasa de 10,5 px por
+   más 4K que sea el proyector. Por eso cada vez que sube el piso sube también
+   el techo, en la misma proporción; subir sólo el piso no arregla nada.
+
+   El término medio va en `vh` a propósito: la lámina mide 100vh y no scrollea,
+   así que el texto tiene que crecer con el ALTO disponible, no con el ancho.
+
+     micro / versalita ....... 12 → 13,5 px
+     apoyo / glosa / pie ..... 12–13 → 13,5–15 px
+     cuerpo / valor de celda . 13–14 → 15–16,5 px
+     cifra (renta) ........... 15 → 18 px
+
+   Las jerarquías se mantienen: lo que antes era más grande sigue siéndolo. */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--rhd); background:var(--surface); color:var(--body);
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+.slide{
+  width:100vw; height:100vh; display:flex; flex-direction:column;
+  padding:clamp(20px,2.6vh,30px) clamp(30px,3.4vw,40px);
+  overflow:hidden;
+}
+
+/* ---------- header ---------- */
+.head{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:12px; flex:0 0 auto}
+.head h1{font-family:var(--rhd); font-weight:800; font-size:clamp(1.5rem,2.5vw,2rem); color:var(--heading); line-height:1.05; letter-spacing:-.01em}
+.head .ctx{font-family:var(--inter); font-weight:400; font-size:16px; color:var(--sec); margin-top:5px}
+.brand{position:relative; height:34px; flex:0 0 auto}
+.brand img{height:34px; width:auto; display:block}
+.brand .ln{position:absolute; right:0; top:0}
+.brand .ln{opacity:0}
+:root[data-theme="dark"] .brand .lp{opacity:0}
+:root[data-theme="dark"] .brand .ln{opacity:1}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex; align-items:center; justify-content:flex-end; gap:20px; margin-bottom:12px; flex:0 0 auto}
+.tools-right{display:flex; align-items:center; gap:12px}
+.count{font-family:var(--inter); font-weight:500; font-size:clamp(13px,1.5vh,15px); color:var(--sec)}
+.count .n{font-family:var(--rhd); font-weight:700; color:var(--heading)}
+/* La altura del botón queda clavada en 34 px a propósito: es lo que fija el
+   alto de la barra y cada píxel que crezca acá se lo quita a la matriz. El
+   texto crece dentro, centrado (padding lateral 20 = escala de marca; antes
+   era 16, que no está en la escala). */
+.btn-clear{
+  font-family:var(--rhd); font-weight:600; font-size:clamp(13.5px,1.6vh,15.5px); color:var(--body);
+  background:var(--card); border:1px solid var(--border-2); border-radius:15px;
+  padding:8px 20px; height:34px; cursor:pointer; transition:background .15s,border-color .15s;
+  display:inline-flex; align-items:center; gap:8px; opacity:0; pointer-events:none;
+}
+.btn-clear.show{opacity:1; pointer-events:auto}
+.btn-clear:hover{background:var(--chip); border-color:var(--border-2)}
+
+/* ---------- matrix ---------- */
+.matrix{
+  flex:1 1 auto; min-height:0; display:flex; align-items:stretch;
+  background:var(--card); border:1px solid var(--border); border-radius:20px; overflow:hidden;
+}
+.labels{
+  flex:0 0 clamp(150px,13vw,182px); display:flex; flex-direction:column;
+  background:var(--surface); border-right:1px solid var(--border); order:0;
+}
+.lab-head{flex:0 0 var(--h0); display:flex; align-items:flex-end; padding:12px}
+.lab-head .t{font-family:var(--rhd); font-weight:700; font-size:clamp(12px,1.35vh,13.5px); letter-spacing:1px; text-transform:uppercase; color:var(--muted)}
+.lab-rows{flex:1 1 auto; min-height:0; display:flex; flex-direction:column}
+.lab-cell{
+  flex:1 1 0; min-height:0; display:flex; flex-direction:column; justify-content:center;
+  padding:8px 12px; border-top:1px solid var(--border);
+}
+/* El rótulo de fila manda sobre su glosa: por eso .rl sube a 13–15 y .rs se
+   queda en 12–13. Si la glosa subiera al 13–15 que le tocaría por ser texto de
+   apoyo, quedaría del mismo tamaño que el rótulo y se perdería la jerarquía.
+   (`rs` es opcional y hoy ningún proceso lo usa.) */
+.lab-cell .rl{font-family:var(--rhd); font-weight:700; font-size:clamp(13px,1.5vh,15px); letter-spacing:.4px; text-transform:uppercase; color:var(--sec); line-height:1.2}
+.lab-cell .rs{font-family:var(--inter); font-weight:400; font-size:clamp(12px,1.3vh,13px); color:var(--muted); margin-top:2px}
+
+/* Alto de la fila de cabecera. Ahora apila CUATRO cosas: nombre, edad, pill de
+   comuna y el toggle "Comparar". El .c-head tiene `overflow:hidden`, así que si
+   este alto queda corto lo que se corta es el toggle (va con `margin-top:auto`,
+   pegado abajo) — ya nos pasó. Medido en el peor caso (1280×720, todo en el
+   piso del clamp, y con el nombre más largo partido en DOS líneas — que es lo
+   que le pasa a "Débora Velásquez Arroyo" en una columna de cinco) el contenido
+   pide 118 px; 124 deja 6 px de resguardo. Dimensionar esto para el nombre de
+   UNA línea es exactamente como se cortaba el toggle antes.
+   El costo sale de la matriz, pero la fila COMUNA se fue de la tabla, así que
+   el balance sigue a favor. */
+:root{--h0:clamp(124px,14vh,130px)}
+
+/* candidate column */
+.col{
+  flex:1 1 0; min-width:0; position:relative; border-right:1px solid var(--border);
+  transition:opacity .45s ease, flex-grow .5s ease, flex-basis .5s ease;
+}
+.col:last-child{border-right:none}
+.col-inner{height:100%; display:flex; flex-direction:column; will-change:transform; position:relative}
+/* min-height:0 + overflow:hidden son OBLIGATORIOS: sin ellos el min-height:auto
+   de flex deja que el header CREZCA cuando el nombre se parte en 3 líneas
+   (columnas atenuadas, que quedan angostas), empujando sus filas hacia abajo y
+   desalineándolas de los criterios de la izquierda. */
+/* El padding baja de 12/14 a 8/12 (los dos siguen en la escala 4/8/12/20…):
+   con la tipografía más grande el alto libre del header es lo que escasea, y
+   los 12 px laterales además le dan cuatro píxeles más de ancho al nombre —
+   suficiente para que "Macarena Berríos Muñoz" siga entrando en una línea. */
+.c-head{
+  flex:0 0 var(--h0); min-height:0; overflow:hidden;
+  padding:8px 12px; display:flex; flex-direction:column; align-items:center; gap:4px;
+  text-align:center;
+  cursor:pointer; border-bottom:0; position:relative; background:var(--card);
+}
+/* El nombre sigue midiéndose en vw (no en vh) porque lo que decide si se parte
+   en dos líneas es el ANCHO de la columna. El techo sube de 15,5 a 16 nomás:
+   más alto que eso y en 5 columnas el nombre largo se parte igual. */
+.c-name{font-family:var(--rhd); font-weight:700; font-size:clamp(14px,1.1vw,16px); color:var(--heading); line-height:1.1; letter-spacing:-.01em}
+.c-meta{font-family:var(--inter); font-weight:400; font-size:clamp(12.5px,1.45vh,14.5px); color:var(--sec); line-height:1.25}
+.c-toggle{
+  margin-top:auto; align-self:center; font-family:var(--inter); font-weight:600; font-size:clamp(12px,1.3vh,13px);
+  letter-spacing:.3px; color:var(--sec); background:var(--chip); border:1px solid var(--border);
+  border-radius:9999px; padding:4px 12px; display:inline-flex; align-items:center; gap:4px;
+  transition:background .15s,color .15s,border-color .15s; user-select:none;
+}
+.c-toggle .dot{width:8px; height:8px; border-radius:50%; border:1.5px solid var(--muted); transition:all .15s}
+.c-rows{flex:1 1 auto; min-height:0; display:flex; flex-direction:column}
+/* Contenido de las columnas de candidato centrado (la columna de criterios de
+   la izquierda se mantiene alineada a la izquierda: es un rail de etiquetas). */
+/* Padding 8/14 → 4/12 (ambos en la escala). Es el ajuste que financia la
+   tipografía más grande: son 7 filas que no scrollean, así que cada 4 px que
+   se le devuelven a cada celda valen 28 px de aire en toda la matriz. Como el
+   contenido va centrado, en las celdas que sobran espacio no se nota nada;
+   sólo importa en la de "Estudios", que es la más alta. */
+.cell{
+  flex:1 1 0; min-height:0; display:flex; flex-direction:column;
+  justify-content:center; align-items:center; text-align:center;
+  padding:4px 12px; border-top:1px solid var(--border); overflow:hidden;
+}
+.cell:nth-child(odd){background:var(--zebra)}
+
+/* selected / dimmed states */
+.col.selected{z-index:3}
+.col.selected .col-inner{ border-radius:16px; overflow:hidden; }
+/* El marco de selección va en un overlay, no como `box-shadow:inset` en
+   .col-inner: las celdas tienen fondo propio (zebra) y pintaban encima del
+   inset, dejando el marco cortado en trozos verticales. */
+.col.selected .col-inner::after{
+  content:""; position:absolute; inset:0; z-index:4; pointer-events:none;
+  border:2px solid var(--accent); border-radius:16px;
+}
+.col.selected .c-toggle{background:var(--accent); color:#fff; border-color:var(--accent)}
+.col.selected .c-toggle .dot{background:#fff; border-color:#fff}
+.col.selected .c-name{color:var(--heading)}
+.matrix.comparing .col.dimmed{opacity:.32; flex-grow:.34}
+.matrix.comparing .col.selected{flex-grow:1.55}
+.matrix.comparing .col.dimmed .c-head{cursor:pointer}
+
+/* ---------- cell content ---------- */
+.pill{
+  display:inline-flex; align-items:center; gap:4px; font-family:var(--inter); font-weight:600;
+  font-size:clamp(12px,1.35vh,13.5px); padding:4px 10px; border-radius:9999px; white-space:nowrap; align-self:center;
+}
+.pill svg{display:block}
+.pill.yes{color:var(--pos); background:var(--pos-bg)}
+.pill.no{color:var(--sec); background:var(--chip); border:1px solid var(--border)}
+/* Estado de validación PENDIENTE. La clase se llamaba `warn` y el nombre
+   invitaba a tratarlo como advertencia: no lo es. Ver la regla en renderCell(). */
+.pill.pend{color:var(--accent-txt); background:rgba(253,101,13,.10)}
+/* Pill de comuna, en el encabezado de la columna. Va `inline-block` y no
+   `inline-flex` como las demás (no lleva ícono) para poder acotarla al ancho
+   de la columna: "Cobquecura / Chillán" entra completa en una columna normal,
+   pero cuando el comparador atenúa una columna ésta se angosta a un tercio y
+   sin el `max-width` la pill se desbordaría por los dos lados. */
+.pill.comuna{
+  display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis;
+  color:var(--heading); background:var(--chip); border:1px solid var(--border); font-weight:500;
+}
+/* Estado del vínculo laboral, bajo el cargo. */
+.pill.est-lab{margin-top:4px}
+
+.renta-val{font-family:var(--rhd); font-weight:700; font-size:clamp(15px,1.75vh,18px); color:var(--heading); line-height:1; margin-bottom:5px; letter-spacing:-.01em}
+.renta-bar{width:100%; height:8px; display:block}
+
+/* Valor de texto corto de una celda (lo usan las filas variables de tipo
+   'text'). Se llamaba `.comuna-name` de cuando la comuna era una fila. */
+.val-text{font-family:var(--rhd); font-weight:600; font-size:clamp(14px,1.65vh,16.5px); color:var(--heading); line-height:1.1; margin-bottom:4px}
+
+.tags{display:flex; flex-wrap:wrap; justify-content:center; gap:4px}
+.tag{
+  font-family:var(--inter); font-weight:600; font-size:clamp(12px,1.3vh,13px); padding:3px 9px; border-radius:9999px;
+  background:var(--chip); border:1px solid var(--border); color:var(--heading); white-space:nowrap;
+}
+.tag.hi{color:var(--accent-txt); background:rgba(253,101,13,.10); border-color:rgba(253,101,13,.22)}
+
+.est-head{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px 8px}
+.est-head .pill{align-self:center}
+/* Mismo trato tipográfico para las dos celdas de tres piezas (Estudios y Cargo
+   actual): titular en Red Hat Display, glosa en Inter. Que compartan escala es
+   lo que hace que la matriz se lea como una tabla y no como cinco fichas. */
+.est-c,.cargo-t{font-family:var(--rhd); font-weight:600; font-size:clamp(13px,1.5vh,15px); color:var(--heading); line-height:1.15}
+.est-i,.cargo-e{font-family:var(--inter); font-weight:400; font-size:clamp(12px,1.35vh,13.5px); color:var(--sec); margin-top:2px; line-height:1.2}
+
+/* Aviso de datos ausentes: no es parte de la lámina, es para quien edita
+   proceso.js. Comparte tokens con el resto para no parecer un error del
+   navegador. */
+.datafail{
+  height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px; text-align:center; padding:40px;
+}
+.datafail h1{font-family:var(--rhd); font-weight:800; font-size:22px; color:var(--heading)}
+.datafail p{font-family:var(--inter); font-weight:400; font-size:15px; color:var(--sec)}
+
+@media (prefers-reduced-motion:reduce){
+  .col,.col-inner{transition:none !important}
+}
+</style>
+</head>
+<body>
+<main class="slide">
+
+  <header class="head">
+    <div>
+      <h1>Resumen comparativo</h1>
+      <p class="ctx" id="ctx"></p>
+    </div>
+    <!-- Las dos versiones apiladas: el CSS enciende la que corresponde al tema. -->
+    <div class="brand">
+      <img class="lp" src="../assets/logo-horizontal-positivo.svg" alt="Mandomedio">
+      <img class="ln" src="../assets/logo-horizontal-negativo.svg" alt="">
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="tools-right">
+      <span class="count" id="count"><span class="n">0</span> de 3 seleccionados</span>
+      <button class="btn-clear" id="clear" type="button" aria-label="Limpiar comparación">
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Limpiar
+      </button>
+    </div>
+  </div>
+
+  <section class="matrix" id="matrix" aria-label="Matriz comparativa de candidatos">
+    <div class="labels" id="labels">
+      <div class="lab-head"><span class="t">Criterio</span></div>
+      <div class="lab-rows" id="labRows"></div>
+    </div>
+    <!-- candidate columns injected here -->
+  </section>
+
+</main>
+
+<script>
+(function(){
+  "use strict";
+
+  var P = window.PROCESO;
+
+  // Sin datos no hay lámina. El aviso es para quien edita proceso.js, así que
+  // dice qué archivo revisar y nada más: nunca se ve en una presentación con
+  // los datos puestos.
+  if(!P){
+    document.body.innerHTML =
+      '<div class="datafail">'+
+        '<h1>No se pudo mostrar la comparativa</h1>'+
+        '<p>data/proceso.js no cargó o tiene un error de sintaxis</p>'+
+      '</div>';
+    return;
+  }
+
+  var meta = P.meta || {};
+  document.title = 'Comparativa — Presentación de candidatos' + (meta.cargo ? ' · ' + meta.cargo : '');
+  // El header usa la razón social corta si existe: en este ancho el nombre
+  // largo de la empresa parte la línea.
+  document.getElementById('ctx').textContent =
+    [meta.cargo, meta.empresaCorta || meta.empresa].filter(Boolean).join(' · ');
+
+  // ---- iconos SVG inline (nunca emojis) ----
+  // Acá NO hay ícono de alerta, y es a propósito: esta lámina no advierte de
+  // nada sobre un candidato. El triángulo de peligro que acompañaba a la
+  // validación pendiente se eliminó junto con su uso (ver renderCell); si
+  // vuelve a aparecer en este objeto, algo se salió de la regla.
+  var ICON = {
+    check:'<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M13 4.6 6.6 12 3 8.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    minus:'<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 8h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
+  };
+
+  // Las celdas se arman como HTML, pero lo que viene de PROCESO acá es texto
+  // plano (ningún campo de la comparativa es richtext): se escapa antes de
+  // entrar, para que un "&" o un "<" en un nombre no rompa la matriz.
+  function esc(v){
+    return String(v == null ? '' : v)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ---- CANDS: PROCESO.candidatos proyectado a lo que necesita la matriz ----
+  // estudios[0] es el título principal: es el único que muestra esta lámina.
+  // `validado` viaja como titulo.ok porque es la pill que va junto a la carrera.
+  var CANDS = (P.candidatos || []).map(function(c){
+    var est = (c.estudios && c.estudios[0]) || {};
+    return {
+      id: c.id,
+      nombre: c.nombre,
+      edad: c.edad,
+      comuna: c.comuna,          // va en el encabezado de la columna, no en una fila
+      renta: c.rentaPretension,
+      trabajando: c.trabajando,
+      // El cargo de la tabla es `cargoCorto`, NO `cargoActual`: el largo es el
+      // del descriptor real ("Encargada Territorial de Programa Prevención de
+      // las Violencias de Género") y en una columna de cinco son cuatro o cinco
+      // líneas. El fallback a `cargoActual` existe para no dejar la celda vacía
+      // si un proceso todavía no declara la forma corta, pero ahí la fila se
+      // estira: la forma corta es parte del contrato (ver data/proceso.js).
+      cargo: c.cargoCorto || c.cargoActual || '',
+      empresa: c.empresaActual || '',
+      est: {c: est.titulo || '', i: est.institucion || ''},
+      // Sólo el booleano: la validación tiene DOS estados y nada más (ver
+      // renderCell). El campo `estudios[].nota` que existía para acotar el
+      // estado pendiente ya no se lee — era la puerta por la que volvía un
+      // tercer estado escrito a mano.
+      titulo: {ok: !!est.validado},
+      criterios: c.criterios || {}
+    };
+  });
+
+  // Techo común de las barras de renta, para comparar de un vistazo. Lo normal
+  // es que lo fije el proceso (comparativa.escalaMax); si falta, se toma la
+  // renta más alta redondeada hacia arriba al $100.000 — así la mayor llega al
+  // tope y las demás se leen en proporción.
+  var SCALE_MAX = (P.comparativa && P.comparativa.escalaMax) || (function(){
+    var max = 0;
+    CANDS.forEach(function(c){ if(typeof c.renta === 'number' && c.renta > max) max = c.renta; });
+    return max ? Math.ceil(max / 100000) * 100000 : 1;   // 1 = sin rentas; evita dividir por cero
+  })();
+
+  // El orden de ROWS manda: de acá salen tanto la columna de criterios como
+  // las celdas de cada candidato. Las tres primeras son fijas en todo proceso;
+  // las que siguen las declara comparativa.filasCriterios.
+  // La COMUNA ya no es fila: subió al encabezado de la columna. Como dato de
+  // identificación del candidato (igual que el nombre y la edad) pertenece a
+  // la cabecera, no a la matriz de comparación, y de paso libera una fila de
+  // alto para las que sí se comparan.
+  var ROWS = [
+    {key:'est',   label:'Estudios'},
+    {key:'renta', label:'Renta pretendida'},
+    // Antes era "¿Trabajando hoy?" y respondía Sí/No. El dato que sirve para
+    // decidir no es si trabaja, sino EN QUÉ: el rótulo dejó de ser una
+    // pregunta y la celda muestra el cargo, su estado y la organización.
+    {key:'cargo', label:'Cargo actual'}
+  ].concat(((P.comparativa && P.comparativa.filasCriterios) || []).map(function(f){
+    // `crit` marca las filas variables: sin él, una key repetida en
+    // filasCriterios (p.ej. "renta") secuestraría una fila fija.
+    // `sub` es opcional y hoy nadie lo usa; la etiqueta lo pinta si aparece.
+    return {key:f.key, label:f.label, tipo:f.tipo, sub:f.sub, crit:true};
+  }));
+
+  var pesos = function(n){ return '$' + n.toLocaleString('es-CL'); };
+  var yesPill = function(t){ return '<span class="pill yes">'+ICON.check+(t||'Sí')+'</span>'; };
+  var noPill  = function(t){ return '<span class="pill no">'+ICON.minus+(t||'No')+'</span>'; };
+
+  function renderCell(c, r){
+    if(r.crit) return renderCriterio(c, r);
+    switch(r.key){
+      case 'renta':
+        if(typeof c.renta !== 'number') return noPill('—');
+        // El tope se acota a 100: si una pretensión supera escalaMax, la barra
+        // se lee llena en vez de desbordar el viewBox.
+        var pct = Math.min(100, Math.round(c.renta / SCALE_MAX * 100));
+        return '<span class="renta-val">'+pesos(c.renta)+'</span>'+
+          '<svg class="renta-bar" viewBox="0 0 200 8" preserveAspectRatio="none" aria-hidden="true">'+
+            '<rect x="0" y="1" width="200" height="6" rx="3" fill="var(--bar-track)"/>'+
+            '<rect x="0" y="1" width="'+(pct*2)+'" height="6" rx="3" fill="#FD650D"/>'+
+          '</svg>';
+      case 'cargo':
+        // Sin cargo cargado va el guion, igual que en Estudios: no se inventa
+        // ni se deduce del booleano `trabajando`.
+        if(!c.cargo) return noPill('—');
+        // Tres piezas apiladas: cargo · estado del vínculo · organización.
+        // La pill reemplaza al Sí/No que había antes; dice lo mismo pero
+        // pegada al dato que lo explica, y usa las mismas dos palabras que el
+        // CV y el perfil ("En ejercicio" / "Último cargo"), para que las tres
+        // láminas hablen igual.
+        return '<span class="cargo-t">'+esc(c.cargo)+'</span>'+
+               (c.trabajando
+                 ? '<span class="pill yes est-lab">'+ICON.check+'En ejercicio</span>'
+                 : '<span class="pill no est-lab">'+ICON.minus+'Último cargo</span>')+
+               (c.empresa ? '<span class="cargo-e">'+esc(c.empresa)+'</span>' : '');
+      case 'est':
+        // Sin estudios cargados no se dice nada del estado de validación
+        // (suena a reproche cuando en realidad falta el dato): va el guion.
+        if(!c.est.c) return noPill('—');
+        // REGLA — el estado de una validación tiene DOS valores y sólo dos:
+        // "Validado" o "Pendiente". Nada de un tercer estado, ni notas al
+        // margen, ni íconos de alerta.
+        //   · El ✓ de "Validado" se queda: es marca de confirmación.
+        //   · "Pendiente" va SIN ícono. Antes decía "Sin validar" con un
+        //     triángulo de peligro, y eso se lee como "hay un problema con
+        //     este candidato" cuando lo único que dice es que Mandomedio
+        //     todavía no verificó el título. Es un pendiente del PROCESO, no
+        //     una falta del candidato — y el cliente está mirando esta lámina
+        //     mientras decide, así que la diferencia importa.
+        // Las filas de Sí/No (¿trabajando hoy?, movilización, indicadores) son
+        // otra pregunta y su lenguaje no se toca.
+        var val = c.titulo.ok
+          ? '<span class="pill yes">'+ICON.check+'Validado</span>'
+          : '<span class="pill pend">Pendiente</span>';
+        return '<div class="est-head"><span class="est-c">'+esc(c.est.c)+'</span>'+val+'</div>'+
+               (c.est.i ? '<span class="est-i">'+esc(c.est.i)+'</span>' : '');
+    }
+    return '';
+  }
+
+  // Filas variables. El `tipo` lo declara comparativa.filasCriterios y decide
+  // cómo se dibuja el valor que el candidato guarda en `criterios[key]`.
+  function renderCriterio(c, r){
+    var v = c.criterios[r.key];
+    if(r.tipo === 'tags'){
+      var tags = (Array.isArray(v) ? v : []).map(function(h){
+        return '<span class="tag'+(h.hi?' hi':'')+'">'+esc(h.t)+'</span>';
+      }).join('');
+      return '<div class="tags">'+tags+'</div>';
+    }
+    if(r.tipo === 'text'){
+      // Texto corto (p.ej. "Excel avanzado").
+      return (v == null || v === '') ? noPill('—') : '<span class="val-text">'+esc(v)+'</span>';
+    }
+    // 'bool' (y cualquier tipo no declarado): sin dato NO es lo mismo que "No",
+    // por eso el guion en vez del pill negativo.
+    if(v == null) return noPill('—');
+    return v ? yesPill() : noPill();
+  }
+
+  // ---- construir labels ----
+  var labRows = document.getElementById('labRows');
+  ROWS.forEach(function(r){
+    var d = document.createElement('div');
+    d.className = 'lab-cell';
+    d.innerHTML = '<span class="rl">'+esc(r.label)+'</span>'+(r.sub?'<span class="rs">'+esc(r.sub)+'</span>':'');
+    labRows.appendChild(d);
+  });
+
+  // ---- construir columnas de candidatos ----
+  var matrix = document.getElementById('matrix');
+  var cols = [];
+  CANDS.forEach(function(c, idx){
+    var col = document.createElement('div');
+    col.className = 'col';
+    col.dataset.id = c.id;
+    col.style.order = '1';
+
+    var rowsHTML = ROWS.map(function(r){
+      return '<div class="cell" role="cell">'+renderCell(c, r)+'</div>';
+    }).join('');
+
+    col.innerHTML =
+      '<div class="col-inner">'+
+        '<div class="c-head" role="button" tabindex="0" aria-pressed="false" '+
+             'aria-label="Seleccionar a '+esc(c.nombre)+' para comparar">'+
+          '<span class="c-name">'+esc(c.nombre)+'</span>'+
+          (c.edad ? '<span class="c-meta">'+esc(c.edad)+' años</span>' : '')+
+          // La comuna es dato de identificación, como el nombre y la edad: por
+          // eso vive acá y no en una fila de la matriz. Va SIN la región: si
+          // los cinco candidatos son de la misma, repetirla cinco veces no
+          // informa nada, y el contexto ya lo da el cargo del proceso que está
+          // en el subtítulo de la lámina. Sin comuna no se pinta la pill vacía.
+          (c.comuna ? '<span class="pill comuna">'+esc(c.comuna)+'</span>' : '')+
+          '<span class="c-toggle"><span class="dot"></span><span class="tg-txt">Comparar</span></span>'+
+        '</div>'+
+        '<div class="c-rows">'+rowsHTML+'</div>'+
+      '</div>';
+
+    matrix.appendChild(col);
+    cols.push(col);
+  });
+
+  // ---- estado + interacción (comparación pareada con FLIP) ----
+  var selected = [];               // ids en orden de selección
+  var MAX = 3;
+  var reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var countEl = document.getElementById('count');
+  var clearBtn = document.getElementById('clear');
+
+  function colById(id){ return cols.filter(function(x){return x.dataset.id===id;})[0]; }
+
+  function paint(){
+    var comparing = selected.length >= 2;
+    matrix.classList.toggle('comparing', comparing);
+
+    cols.forEach(function(col){
+      var isSel = selected.indexOf(col.dataset.id) !== -1;
+      col.classList.toggle('selected', isSel);
+      col.classList.toggle('dimmed', comparing && !isSel);
+      // agrupar seleccionados a la izquierda, atenuados a la derecha (para el "lado a lado")
+      col.style.order = comparing ? (isSel ? '1' : '2') : '1';
+      var head = col.querySelector('.c-head');
+      head.setAttribute('aria-pressed', isSel ? 'true' : 'false');
+      col.querySelector('.tg-txt').textContent = isSel ? 'Seleccionado' : 'Comparar';
+    });
+
+    // toolbar
+    var n = selected.length;
+    countEl.innerHTML = '<span class="n">'+n+'</span> de 3 seleccionados';
+    clearBtn.classList.toggle('show', n > 0);
+  }
+
+  // FLIP: First-Last-Invert-Play sobre translateX + scaleX (contra-escala interna = texto nítido)
+  function withFlip(mutate){
+    if(reduce){ mutate(); paint(); return; }
+    var first = cols.map(function(c){ return c.getBoundingClientRect(); });
+    mutate();
+    paint();
+    var last = cols.map(function(c){ return c.getBoundingClientRect(); });
+    cols.forEach(function(c, i){
+      var dx = first[i].left - last[i].left;
+      var sx = last[i].width > 2 ? first[i].width / last[i].width : 1;
+      if(Math.abs(dx) < 0.5 && Math.abs(sx-1) < 0.004) return;
+      var inner = c.querySelector('.col-inner');
+      c.style.transition = 'none';
+      c.style.transformOrigin = 'left top';
+      c.style.transform = 'translateX('+dx+'px) scaleX('+sx+')';
+      inner.style.transition = 'none';
+      inner.style.transformOrigin = 'left top';
+      inner.style.transform = 'scaleX('+(1/sx)+')';
+    });
+    // forzar reflow y reproducir
+    void matrix.offsetWidth;
+    requestAnimationFrame(function(){
+      cols.forEach(function(c){
+        var inner = c.querySelector('.col-inner');
+        c.style.transition = 'transform .55s cubic-bezier(.4,0,.2,1)';
+        c.style.transform = '';
+        inner.style.transition = 'transform .55s cubic-bezier(.4,0,.2,1)';
+        inner.style.transform = '';
+      });
+    });
+  }
+
+  function toggle(id){
+    var i = selected.indexOf(id);
+    if(i !== -1){
+      withFlip(function(){ selected.splice(i,1); });
+      return;
+    }
+    if(selected.length >= MAX){
+      // Tope alcanzado: el rechazo se comunica con la sacudida de la columna
+      // y con el contador "3 de 3", sin texto de ayuda en pantalla.
+      var flash = colById(id);
+      if(flash){ flash.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:220}); }
+      return;
+    }
+    withFlip(function(){ selected.push(id); });
+  }
+
+  function clearAll(){
+    if(!selected.length) return;
+    withFlip(function(){ selected = []; });
+  }
+
+  // clicks / teclado en headers
+  cols.forEach(function(col){
+    var head = col.querySelector('.c-head');
+    head.addEventListener('click', function(){ toggle(col.dataset.id); });
+    head.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(col.dataset.id); }
+    });
+  });
+  clearBtn.addEventListener('click', clearAll);
+
+  // atajos: 1-9 alternan candidato (tantos como columnas haya; las teclas que
+  // sobran no hacen nada), Esc/0 limpian
+  document.addEventListener('keydown', function(e){
+    if(e.key >= '1' && e.key <= '9'){ var idx = parseInt(e.key,10)-1; if(CANDS[idx]) toggle(CANDS[idx].id); }
+    else if(e.key === 'Escape' || e.key === '0'){ clearAll(); }
+  });
+
+  // deep-link a una comparación (útil como leave-behind compartible): ?sel=ester,javier
+  var qs = new URLSearchParams(location.search).get('sel');
+  if(qs){
+    qs.split(',').map(function(s){return s.trim();}).filter(Boolean).slice(0,MAX).forEach(function(tok){
+      var byName = CANDS.filter(function(c){return c.id===tok;})[0];
+      if(byName){ if(selected.indexOf(byName.id)===-1) selected.push(byName.id); return; }
+      var n = parseInt(tok,10); if(n>=1 && n<=CANDS.length){ var id=CANDS[n-1].id; if(selected.indexOf(id)===-1) selected.push(id); }
+    });
+  }
+
+  paint();
+})();
+</script>
+</body>
+</html>

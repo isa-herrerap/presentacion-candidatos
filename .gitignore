@@ -1,0 +1,22 @@
+# Datos reales de candidatos (PII: RUT, teléfono, dirección, fotos) — nunca a GitHub
+casos/
+
+# Decks generados: procesos reales de clientes, quedan solo locales
+decks/
+
+# Entorno virtual de Python (se regenera con el setup del CLAUDE.md)
+.venv/
+
+# Cache de Python
+__pycache__/
+*.pyc
+
+# Basura de macOS
+.DS_Store
+**/.DS_Store
+
+# Capturas temporales de verificación con Playwright
+.playwright-mcp/
+
+# Captura suelta corrupta de una verificación anterior
+/01-portada.png

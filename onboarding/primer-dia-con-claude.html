@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Primer día con Claude — Equipo Mandomedio</title>
+<style>
+/* ============ Utilidades estilo Tailwind, escritas a mano ============
+   (sin CDN: este archivo se abre con doble clic, sin internet de por medio) */
+*,*::before,*::after{box-sizing:border-box}
+.flex{display:flex} .grid{display:grid} .hidden{display:none !important}
+.flex-col{flex-direction:column} .items-center{align-items:center} .items-start{align-items:flex-start}
+.justify-between{justify-content:space-between} .justify-center{justify-content:center}
+.gap-1{gap:.25rem} .gap-2{gap:.5rem} .gap-3{gap:.75rem} .gap-4{gap:1rem} .gap-6{gap:1.5rem} .gap-8{gap:2rem}
+.w-full{width:100%} .max-w-3xl{max-width:48rem} .mx-auto{margin-left:auto;margin-right:auto}
+.rounded-lg{border-radius:.75rem} .rounded-xl{border-radius:1rem} .rounded-2xl{border-radius:1.25rem} .rounded-full{border-radius:9999px}
+.p-2{padding:.5rem} .p-3{padding:.75rem} .p-4{padding:1rem} .p-5{padding:1.25rem} .p-6{padding:1.5rem} .p-8{padding:2rem}
+.px-3{padding-left:.75rem;padding-right:.75rem} .px-4{padding-left:1rem;padding-right:1rem} .px-5{padding-left:1.25rem;padding-right:1.25rem}
+.py-1{padding-top:.25rem;padding-bottom:.25rem} .py-2{padding-top:.5rem;padding-bottom:.5rem} .py-3{padding-top:.75rem;padding-bottom:.75rem}
+.mt-1{margin-top:.25rem} .mt-2{margin-top:.5rem} .mt-3{margin-top:.75rem} .mt-4{margin-top:1rem} .mt-6{margin-top:1.5rem} .mt-8{margin-top:2rem} .mt-10{margin-top:2.5rem}
+.mb-1{margin-bottom:.25rem} .mb-2{margin-bottom:.5rem} .mb-3{margin-bottom:.75rem} .mb-4{margin-bottom:1rem}
+.text-xs{font-size:.75rem} .text-sm{font-size:.875rem} .text-base{font-size:1rem} .text-lg{font-size:1.125rem}
+.text-xl{font-size:1.375rem} .text-2xl{font-size:1.75rem} .text-3xl{font-size:2.25rem}
+.font-medium{font-weight:500} .font-semibold{font-weight:600} .font-bold{font-weight:700} .font-black{font-weight:800}
+.italic{font-style:italic} .uppercase{text-transform:uppercase} .tracking-wide{letter-spacing:.04em}
+.leading-relaxed{line-height:1.65} .text-center{text-align:center}
+.border{border-width:1px;border-style:solid} .cursor-pointer{cursor:pointer}
+.relative{position:relative} .absolute{position:absolute} .overflow-hidden{overflow:hidden}
+.transition{transition:all .25s ease}
+@media (min-width:640px){ .sm\:flex-row{flex-direction:row} .sm\:grid-cols-2{grid-template-columns:1fr 1fr} }
+
+/* ============ Tokens de marca (paleta y tipografía) ============ */
+:root{
+  --bg:#F4F6F8; --surface:#FFFFFF; --surface-2:#EEF1F4; --border:#E1E6EB;
+  --ink:#1E2D3B; --body:#3A4650; --muted:#64707B;
+  --accent:#FD650D; --accent-ink:#B34A09; --accent-soft:#FFE8D9; --accent-soft-border:#FFC9A3;
+  --peach:#FFAE7F; --navy-elevated:#28394A;
+  --error:#DC2626; --error-soft:#FDE8E8;
+  --font-display: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-body: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-kicker: Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1E2D3B; --surface:#25333F; --surface-2:#2C3D4B; --border:#38495980;
+    --ink:#FFFFFF; --body:rgba(255,255,255,.82); --muted:rgba(255,255,255,.55);
+    --accent:#FD650D; --accent-ink:#FFAE7F; --accent-soft:rgba(253,101,13,.16); --accent-soft-border:rgba(253,101,13,.4);
+    --error:#F87171; --error-soft:rgba(220,38,38,.15);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1E2D3B; --surface:#25333F; --surface-2:#2C3D4B; --border:#38495980;
+  --ink:#FFFFFF; --body:rgba(255,255,255,.82); --muted:rgba(255,255,255,.55);
+  --accent:#FD650D; --accent-ink:#FFAE7F; --accent-soft:rgba(253,101,13,.16); --accent-soft-border:rgba(253,101,13,.4);
+  --error:#F87171; --error-soft:rgba(220,38,38,.15);
+}
+
+body{ margin:0; background:var(--bg); color:var(--body); font-family:var(--font-body); overflow-x:hidden; }
+h1,h2,h3{ font-family:var(--font-display); color:var(--ink); text-wrap:balance; margin:0; }
+::selection{ background:var(--accent-soft); }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{ transition-duration:.01ms !important; animation-duration:.01ms !important; }
+}
+
+.page{ max-width:52rem; margin:0 auto; padding:clamp(28px,6vw,64px) clamp(18px,5vw,28px) 90px; }
+
+.kicker{ font-family:var(--font-kicker); font-style:italic; color:var(--accent-ink); font-size:1.05rem; margin:0 0 8px; }
+.h1{ font-weight:800; letter-spacing:-.025em; font-size:clamp(2.3rem,1.7rem + 3vw,4.4rem); line-height:.99; }
+.lede{ font-size:1.1rem; color:var(--body); max-width:52ch; margin-top:16px; }
+
+/* ---- hero ---- */
+.hero{ position:relative; display:grid; grid-template-columns:1.15fr .85fr; gap:clamp(24px,4vw,48px); align-items:center; }
+.hero::before{ content:""; position:absolute; inset:-48px 0 auto 0; height:460px; z-index:-1; pointer-events:none;
+  background:radial-gradient(60% 60% at 78% 18%, var(--accent-soft) 0%, transparent 72%); }
+.hero-cta-row{ display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-top:30px; }
+.btn-pill-primary{ display:inline-flex; align-items:center; gap:9px; background:var(--accent); color:#fff; text-decoration:none;
+  font-family:var(--font-display); font-weight:700; font-size:.95rem; padding:13px 25px; border-radius:99px; cursor:pointer;
+  box-shadow:0 10px 22px -10px rgba(253,101,13,.6); transition:transform .2s ease, box-shadow .2s ease; }
+.btn-pill-primary:hover{ transform:translateY(-1px); box-shadow:0 14px 26px -10px rgba(253,101,13,.65); }
+.btn-pill-primary .arrow{ transition:transform .2s ease; }
+.btn-pill-primary:hover .arrow{ transform:translateX(3px); }
+.hero-meta{ display:inline-flex; align-items:center; gap:8px; font-size:.85rem; color:var(--muted); font-weight:500; }
+.hero-meta-dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none; }
+
+.hero-visual{ position:relative; min-height:300px; }
+.hero-deco{ position:absolute; z-index:0; pointer-events:none; }
+.hero-card{ position:relative; z-index:1; background:var(--surface); border:1px solid var(--border); border-radius:1.25rem;
+  padding:22px; transform:rotate(2deg); box-shadow:0 28px 52px -22px rgba(30,45,59,.28); }
+.hero-card-dots{ display:flex; gap:6px; margin-bottom:18px; }
+.hero-card-dots span{ width:9px; height:9px; border-radius:50%; background:var(--border); }
+.hero-skel{ height:10px; border-radius:6px; background:var(--surface-2); margin-bottom:11px; }
+.hero-skel.w-90{ width:90%; } .hero-skel.w-70{ width:70%; } .hero-skel.w-50{ width:50%; }
+.hero-block{ position:absolute; right:-16px; bottom:-20px; z-index:2; width:118px; height:118px; border-radius:1.1rem;
+  background:var(--accent); display:flex; align-items:center; justify-content:center; transform:rotate(-4deg);
+  box-shadow:0 18px 34px -14px rgba(253,101,13,.55); }
+.hero-bubble{ position:absolute; left:-20px; top:14px; z-index:2; max-width:208px; background:var(--navy-elevated); color:#fff;
+  font-size:.82rem; line-height:1.5; font-weight:500; padding:12px 16px; border-radius:14px; border-bottom-left-radius:4px;
+  box-shadow:0 18px 34px -16px rgba(0,0,0,.4); }
+
+@media (max-width:820px){
+  .hero{ grid-template-columns:1fr; }
+  .hero-visual{ order:-1; min-height:0; width:100%; max-width:340px; margin:0 auto 32px; }
+  .hero-bubble{ left:-6px; top:-12px; max-width:160px; font-size:.78rem; padding:9px 12px; }
+  .hero-block{ right:-8px; bottom:-8px; width:72px; height:72px; }
+  .hero-block svg{ width:32px; height:32px; }
+  .hero-deco{ display:none; }
+}
+
+.progress-rail{ display:flex; gap:6px; margin:28px 0 8px; }
+.progress-dot{ flex:1; height:4px; border-radius:99px; background:var(--border); }
+.progress-dot.done{ background:var(--accent); }
+
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:1.25rem; padding:clamp(20px,4vw,32px); }
+.section{ margin-top:56px; scroll-margin-top:24px; }
+.section-num{ display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%;
+  background:var(--accent); color:#fff; font-weight:800; font-family:var(--font-display); font-size:.95rem; flex:none; }
+.section-title{ font-weight:700; font-size:clamp(1.2rem,1.05rem + .5vw,1.5rem); }
+.body-text{ font-size:.98rem; line-height:1.7; color:var(--body); max-width:68ch; }
+.body-text + .body-text{ margin-top:12px; }
+code{ font-family:var(--font-mono); font-size:.88em; background:var(--surface-2); color:var(--ink); padding:.15em .4em; border-radius:5px; }
+
+.callout{ background:var(--accent-soft); border:1px solid var(--accent-soft-border); border-radius:1rem; padding:16px 20px; margin-top:14px; }
+.callout p{ margin:0; font-size:.95rem; line-height:1.6; color:var(--body); }
+.callout strong{ color:var(--ink); }
+
+/* ---- widgets interactivos ---- */
+.toggle-row{ display:inline-flex; background:var(--surface-2); border:1px solid var(--border); border-radius:99px; padding:4px; gap:4px; margin-top:16px; }
+.toggle-btn{ border:0; background:transparent; padding:8px 18px; border-radius:99px; font-family:var(--font-display); font-weight:600;
+  font-size:.9rem; color:var(--muted); cursor:pointer; transition:all .2s ease; }
+.toggle-btn.active{ background:var(--accent); color:#fff; }
+
+.chat-mock{ margin-top:18px; border:1px solid var(--border); border-radius:1rem; overflow:hidden; background:var(--surface); }
+.chat-head{ padding:10px 16px; border-bottom:1px solid var(--border); font-size:.78rem; color:var(--muted); font-weight:600; }
+.chat-body{ padding:18px; display:flex; flex-direction:column; gap:12px; min-height:120px; }
+.bubble{ max-width:80%; padding:10px 14px; border-radius:14px; font-size:.9rem; line-height:1.5; }
+.bubble.user{ align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:4px; }
+.bubble.claude{ align-self:flex-start; background:var(--surface-2); color:var(--body); border-bottom-left-radius:4px; }
+.bubble.claude.wrong{ background:var(--error-soft); color:var(--body); border:1px solid var(--error); }
+.bubble-tag{ font-size:.75rem; color:var(--muted); margin-top:4px; }
+
+.meter-wrap{ margin-top:18px; }
+.meter-track{ height:14px; background:var(--surface-2); border:1px solid var(--border); border-radius:99px; overflow:hidden; }
+.meter-fill{ height:100%; background:var(--accent); border-radius:99px; transition:width .5s cubic-bezier(.22,1,.36,1); width:12%; }
+.meter-label{ display:flex; justify-content:space-between; font-size:.78rem; color:var(--muted); margin-top:6px; font-family:var(--font-mono); }
+
+.pair{ display:grid; grid-template-columns:1fr; gap:14px; margin-top:16px; }
+@media (min-width:640px){ .pair{ grid-template-columns:1fr 1fr; } }
+.pair-card{ border:1px solid var(--border); border-radius:1rem; padding:16px; background:var(--surface-2); }
+.pair-card.bad{ border-color:var(--error); }
+.pair-card.good{ border-color:var(--accent-soft-border); background:var(--accent-soft); }
+.pair-label{ font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+.pair-label.bad{ color:var(--error); } .pair-label.good{ color:var(--accent-ink); }
+
+.reveal-btn{ margin-top:14px; border:1px solid var(--accent-soft-border); background:var(--accent-soft); color:var(--accent-ink);
+  font-family:var(--font-display); font-weight:700; font-size:.85rem; padding:9px 18px; border-radius:99px; cursor:pointer; }
+.reveal-box{ display:none; margin-top:14px; }
+.reveal-box.show{ display:block; }
+
+.modecard{ border:1px solid var(--border); border-radius:1rem; padding:18px; margin-top:16px; }
+.modecard ul{ margin:8px 0 0; padding-left:20px; font-size:.9rem; line-height:1.7; }
+.modecard .no{ color:var(--muted); text-decoration:line-through; }
+
+footer{ margin-top:70px; padding-top:22px; border-top:1px solid var(--border); color:var(--muted); font-size:.92rem; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="kicker">Equipo Mandomedio · antes de tu primer deck</p>
+      <h1 class="h1">Primer día con Claude</h1>
+      <p class="lede">Ocho ideas para entender cómo piensa y cómo trabaja, antes de pedirle nada. Toca los ejemplos — se explican mejor haciendo que leyendo.</p>
+      <div class="hero-cta-row">
+        <a href="#s1" class="btn-pill-primary">Empezar <span class="arrow" aria-hidden="true">→</span></a>
+        <span class="hero-meta"><span class="hero-meta-dot" aria-hidden="true"></span>8 conceptos · lectura interactiva</span>
+      </div>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <svg class="hero-deco" style="top:-6px; right:8px; width:120px; height:70px;" viewBox="0 0 120 70" fill="none">
+        <path d="M2 40C22 8 40 62 60 30C78 2 96 46 118 14" stroke="var(--accent)" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <svg class="hero-deco" style="bottom:6px; left:-2px; width:46px; height:46px;" viewBox="0 0 46 46" fill="none">
+        <circle cx="6" cy="6" r="2.2" fill="var(--accent)" fill-opacity=".55"/>
+        <circle cx="18" cy="6" r="2.2" fill="var(--accent)" fill-opacity=".35"/>
+        <circle cx="6" cy="18" r="2.2" fill="var(--accent)" fill-opacity=".35"/>
+        <circle cx="18" cy="18" r="2.2" fill="var(--accent)" fill-opacity=".2"/>
+      </svg>
+
+      <div class="hero-bubble">Ojo: en una conversación nueva, Claude no se acuerda de nada de esto.</div>
+
+      <div class="hero-card">
+        <div class="hero-card-dots"><span></span><span></span><span></span></div>
+        <div class="hero-skel w-90"></div>
+        <div class="hero-skel w-70"></div>
+        <div class="hero-skel w-90"></div>
+        <div class="hero-skel w-50"></div>
+      </div>
+
+      <div class="hero-block">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none">
+          <path d="M4 12a8 8 0 1 1 3.2 6.4L4 20l1.3-3.6A7.96 7.96 0 0 1 4 12Z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/>
+          <circle cx="9" cy="12" r="1.1" fill="#fff"/><circle cx="12.5" cy="12" r="1.1" fill="#fff"/><circle cx="16" cy="12" r="1.1" fill="#fff"/>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <div class="progress-rail" id="progressRail"></div>
+
+  <!-- 1 -->
+  <div class="section" id="s1">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">1</span>
+      <h2 class="section-title">Qué es Claude, en simple</h2>
+    </div>
+    <p class="body-text">Piensa en Claude como un asistente nuevo: muy capaz, muy rápido para leer y escribir, pero que llega el primer día sin saber nada de Mandomedio, de tus procesos ni de tus candidatos.</p>
+    <p class="body-text">Dentro de <strong style="color:var(--ink)">una misma conversación</strong> sí recuerda todo lo hablado. Apenas abres una <strong style="color:var(--ink)">conversación nueva</strong>, parte de cero otra vez. Prueba:</p>
+
+    <div class="toggle-row" role="group" aria-label="Elegir tipo de conversación">
+      <button type="button" class="toggle-btn active" data-memory="same" aria-pressed="true">Misma conversación</button>
+      <button type="button" class="toggle-btn" data-memory="new" aria-pressed="false">Conversación nueva</button>
+    </div>
+
+    <div class="chat-mock">
+      <div class="chat-head">Antes, en este chat, le dijiste: "El proceso se llama Brand Manager – One Summit"</div>
+      <div class="chat-body">
+        <div class="bubble user">¿Para qué proceso estamos trabajando?</div>
+        <div class="bubble claude" id="memoryAnswer">Brand Manager – One Summit.</div>
+      </div>
+    </div>
+    <p class="body-text mt-3" id="memoryNote">Como sigues en la misma conversación, se acuerda de lo que le dijiste antes.</p>
+
+    <div class="callout">
+      <p><strong>Cómo arma sus respuestas:</strong> no busca en una base de datos como Google. Va generando el texto a medida que responde, basado en patrones que aprendió leyendo muchísimo texto — por eso puede sonar muy seguro de algo y aun así estar equivocado. Vuelve en el punto 6.</p>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="section" id="s2">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">2</span>
+      <h2 class="section-title">Por qué tiene que estar "parado" en la carpeta correcta</h2>
+    </div>
+    <p class="body-text">Claude solo ve lo que hay <strong style="color:var(--ink)">dentro</strong> de la carpeta que conectaste. No navega el resto de tu computador ni sabe de otros procesos, a menos que se lo muestres.</p>
+    <p class="body-text">Pedirle algo sin la carpeta conectada es como pedirle a alguien que arme un mueble sin pasarle las piezas ni el manual: va a intentar ayudar igual, y lo más probable es que invente.</p>
+
+    <div class="toggle-row" role="group" aria-label="Elegir si la carpeta está conectada">
+      <button type="button" class="toggle-btn active" data-folder="off" aria-pressed="true">Sin carpeta conectada</button>
+      <button type="button" class="toggle-btn" data-folder="on" aria-pressed="false">Con la carpeta conectada</button>
+    </div>
+
+    <div class="chat-mock">
+      <div class="chat-head" id="folderHead">Carpeta: — ninguna conectada —</div>
+      <div class="chat-body">
+        <div class="bubble user">¿Cuántos candidatos avanzaron a la long list en este proceso?</div>
+        <div class="bubble claude wrong" id="folderAnswer">No tengo un caso conectado para revisar — dime el nombre del proceso o conecta la carpeta con sus documentos.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="section" id="s3">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">3</span>
+      <h2 class="section-title">Los dos modos: Chat y Cowork</h2>
+    </div>
+    <p class="body-text">Vas a ver un botón que alterna entre estos dos modos. Uno conversa, el otro trabaja con tus archivos.</p>
+
+    <div class="toggle-row" role="group" aria-label="Elegir modo">
+      <button type="button" class="toggle-btn active" data-mode="chat" aria-pressed="true">Chat</button>
+      <button type="button" class="toggle-btn" data-mode="cowork" aria-pressed="false">Cowork</button>
+    </div>
+
+    <div class="modecard" id="modeCard">
+      <strong style="color:var(--ink)">Chat — conversación simple</strong>
+      <ul>
+        <li>Responder preguntas generales</li>
+        <li>Redactar o revisar un texto suelto</li>
+        <li class="no">Leer los archivos de tu carpeta</li>
+        <li class="no">Armar el deck de candidatos</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="section" id="s4">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">4</span>
+      <h2 class="section-title">Los tokens: qué son y por qué importan</h2>
+    </div>
+    <p class="body-text">Cada mensaje que escribes, y cada respuesta que te da, consume <strong style="color:var(--ink)">tokens</strong> — piénsalo como los minutos de un plan de teléfono, o la bencina de un auto. El plan de Mandomedio no es gratis ni ilimitado.</p>
+    <p class="body-text">Toca un tipo de pedido y mira cuánto gasta:</p>
+
+    <div class="toggle-row" role="group" aria-label="Elegir tipo de pedido">
+      <button type="button" class="toggle-btn active" data-token="directo" aria-pressed="true">Directo y claro</button>
+      <button type="button" class="toggle-btn" data-token="vago" aria-pressed="false">Vago, con idas y vueltas</button>
+      <button type="button" class="toggle-btn" data-token="imagen" aria-pressed="false">+ una foto adjunta</button>
+    </div>
+
+    <div class="meter-wrap">
+      <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+      <div class="meter-label"><span id="meterText">"Arma la presentación del caso gerente-finanzas-cchc."</span><span id="meterPct">bajo consumo</span></div>
+    </div>
+
+    <div class="callout mt-4">
+      <p><strong>Ayuda a rendir el plan:</strong> sé directa en lo que pides, no repitas info que ya diste en la misma conversación, y abre un chat <em>nuevo</em> para una tarea nueva en vez de seguir alargando una vieja.</p>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="section" id="s5">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">5</span>
+      <h2 class="section-title">El computador y la app tienen que seguir abiertos</h2>
+    </div>
+    <p class="body-text">Claude corre mientras la app sigue abierta y conectada. Si la cierras, o el computador se duerme a mitad de una tarea, el trabajo se corta — como una llamada telefónica, no sigue solo del otro lado.</p>
+    <div class="callout">
+      <p>Armar un deck completo toma varios minutos. Si vas a pedir algo así, revisa que el computador no se vaya a poner a dormir solo a mitad de camino.</p>
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <div class="section" id="s6">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">6</span>
+      <h2 class="section-title">Por qué pregunta en vez de inventar — y por qué SIEMPRE revisas</h2>
+    </div>
+    <p class="body-text">Cuando le falta un dato, la instrucción que sigue es preguntarte a ti, no inventar algo que suene razonable. Pero igual puede equivocarse: leer mal un número, mezclar dos candidatos, entender otra cosa.</p>
+    <p class="body-text">Este párrafo suena seguro. Búscale el error antes de mirar la respuesta:</p>
+
+    <div class="chat-mock">
+      <div class="chat-body">
+        <div class="bubble claude">De los 5 finalistas, 3 avanzaron por hunting y 2 por postulación — el total del proceso fue 214 candidatos.</div>
+      </div>
+    </div>
+
+    <button type="button" class="reveal-btn" id="revealBtn" aria-expanded="false" aria-controls="revealBox">¿Encontraste el error?</button>
+    <div class="reveal-box" id="revealBox">
+      <div class="callout">
+        <p><strong>El error:</strong> dice "3 por hunting y 2 por postulación" pero eso suma 5, no cuadra con que el total del proceso haya sido 214 — mezcló el conteo de los finalistas con el del universo completo. Sonaba perfectamente seguro igual.</p>
+      </div>
+    </div>
+
+    <div class="callout mt-4">
+      <p><strong>Por eso, siempre:</strong> revisa lo que te entrega antes de darlo por bueno — sobre todo si va a llegar a un cliente. La skill del deck se revisa sola, lámina por lámina, y aun así el último paso siempre eres tú.</p>
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <div class="section" id="s7">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">7</span>
+      <h2 class="section-title">Cómo pedirle bien las cosas</h2>
+    </div>
+    <p class="body-text">Sé específica, como si le explicaras la tarea a alguien nuevo en el equipo. Si algo no calza, dilo directo — puedes corregirlo en el momento, no hace falta empezar de nuevo.</p>
+
+    <div class="pair">
+      <div class="pair-card bad">
+        <div class="pair-label bad">Vago</div>
+        <div class="body-text" style="margin:0;">"Arma la presentación de candidatos."</div>
+      </div>
+      <div class="pair-card good">
+        <div class="pair-label good">Específico</div>
+        <div class="body-text" style="margin:0;">"Arma la presentación del caso gerente-finanzas-cchc, la carpeta ya tiene el perfil, el screening y los CV."</div>
+      </div>
+    </div>
+    <p class="body-text mt-4">Y si no entendiste algo, pídele que te lo explique de nuevo, distinto o más simple — así como le pedirías a una colega.</p>
+  </div>
+
+  <!-- 8 -->
+  <div class="section" id="s8">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="section-num">8</span>
+      <h2 class="section-title">Qué pasa con la información que le compartes</h2>
+    </div>
+    <p class="body-text">Lo que subes o escribes queda asociado a tu cuenta de trabajo. Para el detalle exacto de qué se guarda y por cuánto tiempo, confirma con quien administra la cuenta de Claude en Mandomedio — eso depende del plan contratado.</p>
+    <div class="callout">
+      <p><strong>Regla fija, siempre:</strong> nunca compartas RUT, teléfonos, direcciones particulares u otra información sensible de un candidato más allá de lo que la tarea realmente necesita.</p>
+    </div>
+  </div>
+
+  <footer>
+    Con esto ya tienes la base. La guía específica de cómo armar el deck, paso a paso, está en <strong style="color:var(--ink)">"Generar el deck de candidatos con Claude"</strong>.
+  </footer>
+
+</div>
+
+<script>
+// progreso: un punto por sección
+(function(){
+  var rail = document.getElementById('progressRail');
+  for (var i=0;i<8;i++){ var d=document.createElement('div'); d.className='progress-dot'; rail.appendChild(d); }
+  var dots = rail.querySelectorAll('.progress-dot');
+  var sections = document.querySelectorAll('.section');
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      var idx = Array.prototype.indexOf.call(sections, e.target);
+      if (e.isIntersecting) dots[idx].classList.add('done');
+    });
+  }, {threshold:.4});
+  sections.forEach(function(s){ io.observe(s); });
+})();
+
+function wireToggle(selector, dataAttr, onChange){
+  var btns = document.querySelectorAll(selector);
+  btns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      btns.forEach(function(b){ b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed','true');
+      onChange(btn.getAttribute(dataAttr));
+    });
+  });
+}
+
+// 1. memoria
+wireToggle('[data-memory]', 'data-memory', function(v){
+  var ans = document.getElementById('memoryAnswer');
+  var note = document.getElementById('memoryNote');
+  if (v === 'same'){
+    ans.textContent = 'Brand Manager – One Summit.';
+    ans.classList.remove('wrong');
+    note.textContent = 'Como sigues en la misma conversación, se acuerda de lo que le dijiste antes.';
+  } else {
+    ans.textContent = 'No tengo ese dato — ¿para qué proceso me estás preguntando?';
+    ans.classList.add('wrong');
+    note.textContent = 'Al abrir un chat nuevo, no arrastra lo que hablaron en el anterior. Hay que decírselo de nuevo (o conectar la carpeta del caso).';
+  }
+});
+
+// 2. carpeta
+wireToggle('[data-folder]', 'data-folder', function(v){
+  var head = document.getElementById('folderHead');
+  var ans = document.getElementById('folderAnswer');
+  if (v === 'on'){
+    head.textContent = 'Carpeta: casos/gerente-finanzas-cchc/ — conectada';
+    ans.textContent = 'Según el screening, avanzaron 5 a la long list: 3 por hunting y 2 por postulación.';
+    ans.classList.remove('wrong');
+  } else {
+    head.textContent = 'Carpeta: — ninguna conectada —';
+    ans.textContent = 'No tengo un caso conectado para revisar — dime el nombre del proceso o conecta la carpeta con sus documentos.';
+    ans.classList.add('wrong');
+  }
+});
+
+// 3. chat vs cowork
+wireToggle('[data-mode]', 'data-mode', function(v){
+  var card = document.getElementById('modeCard');
+  if (v === 'cowork'){
+    card.innerHTML = '<strong style="color:var(--ink)">Cowork — trabaja con tu carpeta</strong><ul>'
+      + '<li>Leer los archivos de tu carpeta conectada</li>'
+      + '<li>Crear y escribir archivos nuevos (como el deck)</li>'
+      + '<li>Ejecutar tareas de varios pasos, como armar la presentación</li>'
+      + '<li class="no">Nada — en este modo sí puede tocar tus archivos</li></ul>';
+  } else {
+    card.innerHTML = '<strong style="color:var(--ink)">Chat — conversación simple</strong><ul>'
+      + '<li>Responder preguntas generales</li>'
+      + '<li>Redactar o revisar un texto suelto</li>'
+      + '<li class="no">Leer los archivos de tu carpeta</li>'
+      + '<li class="no">Armar el deck de candidatos</li></ul>';
+  }
+});
+
+// 4. tokens
+wireToggle('[data-token]', 'data-token', function(v){
+  var fill = document.getElementById('meterFill');
+  var text = document.getElementById('meterText');
+  var pct = document.getElementById('meterPct');
+  if (v === 'directo'){
+    fill.style.width = '15%';
+    text.textContent = '"Arma la presentación del caso gerente-finanzas-cchc."';
+    pct.textContent = 'bajo consumo';
+  } else if (v === 'vago'){
+    fill.style.width = '55%';
+    text.textContent = '"Necesito como el deck ese... el de candidatos, el que hicimos la otra vez pero para el otro proceso" (+ 4 preguntas de ida y vuelta para aclarar cuál)';
+    pct.textContent = 'consumo medio-alto';
+  } else {
+    fill.style.width = '85%';
+    text.textContent = 'Mismo pedido vago + una foto de la pantalla en vez del nombre del proceso';
+    pct.textContent = 'consumo alto';
+  }
+});
+
+// 6. revelar error
+document.getElementById('revealBtn').addEventListener('click', function(){
+  var box = document.getElementById('revealBox');
+  var expanded = box.classList.toggle('show');
+  this.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+});
+</script>
+</body>
+</html>

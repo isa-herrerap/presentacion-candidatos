@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil de los candidatos — Presentación de candidatos</title>
+<!-- Lámina CONTEXTO · DETALLE — plantilla fija: todo lo que varía por proceso
+     viene de data/proceso.js (PROCESO.contexto.detalle). El título de arriba es
+     el fallback antes de que corra el JS; el definitivo lo pone document.title.
+
+     POR QUÉ EXISTE ESTA LÁMINA APARTE Y NO UNA SOLA CON LAS CUATRO LECTURAS:
+     la ficha completa del candidato (experiencia, cargo actual, última empresa)
+     sólo se tiene de los que se contactaron por HUNTING. De los que llegan por
+     postulación el screening no trae ese dato — por eso sus filas en
+     `candidatos` vienen sólo con `origen`. Graficar esas tres dimensiones sobre
+     los 245 sería inventar: mostraría 31 repartidos como si fueran el universo.
+     Entonces la primera lámina (contexto.html) muestra SOLA la dimensión que sí
+     se tiene de todos (`contexto.principal`, hoy el origen), y ésta muestra el
+     resto contando sólo sobre el subconjunto que declara `detalle.filtro`.
+     El recorte lo dice el TÍTULO ("Perfil de los candidatos por hunting"): el
+     campo `detalle.nota` sigue existiendo en el contrato de datos pero la lámina
+     ya no lo pinta — decisión de Vicente al verla, el encabezado se leía
+     recargado y el título solo ya deja claro de quiénes se está hablando.
+     Si lo vuelves a poner, ojo con el alto del encabezado (ver medirLienzo).
+
+     Si un proceso SÍ tiene la ficha completa de todos, se borra `detalle.filtro`
+     y esta misma lámina cuenta sobre el universo entero: nada más que cambiar.
+
+     Es la misma máquina de la lámina hermana — cuadrícula de gráficos que se
+     revelan encadenados (uno por flecha) y CRUZADOS: clickear una columna filtra
+     los otros gráficos por ese valor. Ver data/SCHEMA.md para el contrato. -->
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Datos del proceso. Va acá, síncrono y antes de todo, para que el script del
+     final ya tenga window.PROCESO y funcione abriendo el archivo con file://. -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;700;800;900&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ===== TEMA =====
+     Idéntico al de contexto.html a propósito: las dos láminas se leen seguidas
+     y cualquier diferencia de color se vería como un salto. Además de las
+     superficies, acá cambia la PALETA CATEGÓRICA del gráfico (--c1..--c3). El
+     JS la lee con getComputedStyle: en oscuro el navy no puede ser una serie,
+     porque es el fondo — desaparecería. */
+  :root{
+    --navy:#1E2D3B; --orange:#FD650D; --peach:#FFAE7F; --white:#FFFFFF;
+
+    --bg:#FFFFFF; --card:#FFFFFF; --surface:#F3F5F9; --border:#E8EAED;
+    --heading:#1E2D3B; --body:#333333; --secondary:#717E8E; --gray:#A8B0BA;
+    --c1:#FD650D; --c2:#1E2D3B; --c3:#FFAE7F;
+
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  :root[data-theme="dark"]{
+    --bg:#1E2D3B; --card:#293745; --surface:#313E4B; --border:rgba(255,255,255,.12);
+    --heading:#FFFFFF; --body:rgba(255,255,255,.80);
+    --secondary:rgba(255,255,255,.70); --gray:rgba(255,255,255,.45);
+    --c1:#FD650D; --c2:#FFAE7F; --c3:#8FA3B8;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:var(--bg); }
+  body{ font-family:"Inter",sans-serif; color:var(--body); -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  /* El padding-bottom reserva la banda del logo del pie: el logo lo monta el
+     SHELL (deck.html) por encima del iframe, una sola vez para todo el deck.
+     Sin esta reserva las cards quedarían por debajo del lockup. */
+  .slide{ position:relative; width:100vw; height:100vh; background:var(--bg);
+    display:flex; flex-direction:column; justify-content:flex-start;
+    padding:clamp(40px,5vw,72px); padding-bottom:clamp(70px,10vh,92px); overflow:hidden; }
+
+  .content{ width:100%; max-width:1140px; height:100%; margin:0 auto;
+    display:flex; flex-direction:column; min-height:0; }
+
+  /* ===== Encabezado =====
+     El margen de abajo son 40 y no 20 porque esa banda es donde vive el chip
+     del filtro (ver .filter-chip). Se reserva SIEMPRE, haya filtro o no: es un
+     valor fijo, así que la fila de cards mide lo mismo en los dos casos. */
+  .head{ position:relative; display:flex; align-items:flex-start; justify-content:space-between;
+    gap:30px; margin-bottom:40px; }
+
+  /* ===== PISO TIPOGRÁFICO =====
+     Esto se presenta a clientes en pantalla grande y la lámina ocupa el viewport
+     entero SIN escalado: un `font-size` acá es el tamaño real en pantalla. Por
+     eso ningún texto visible baja de 12 px, y por eso los clamp llevan techo
+     alto — un techo bajo es tan culpable como un piso bajo: la letra se queda
+     chica por mucho que crezca la pantalla. Los tamaños del SVG (rótulos, valores
+     y ticks) NO están acá: viven en el JS, ver FS_VAL / FS_LBL / FS_TICK. */
+  .kicker{ font-family:"Red Hat Display",sans-serif; font-weight:700;
+    font-size:clamp(12px,.9vw,14px); text-transform:uppercase; letter-spacing:1.5px; color:var(--secondary);
+    margin-bottom:8px;
+    opacity:0; transform:translateY(12px); transition:opacity .7s var(--ease), transform .7s var(--ease); transition-delay:.12s; }
+
+  .title{ font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(26px,2.3vw,36px); line-height:1.05; letter-spacing:-.02em; color:var(--heading);
+    opacity:0; transform:translateY(18px); transition:opacity .7s var(--ease), transform .7s var(--ease); transition-delay:.20s; }
+  .title .accent{ color:var(--orange); }
+
+  .head-stat{ text-align:right; flex:none;
+    opacity:0; transform:translateY(18px); transition:opacity .7s var(--ease), transform .7s var(--ease); transition-delay:.30s; }
+  .stat-number{ font-family:"Red Hat Display",sans-serif; font-weight:900;
+    letter-spacing:-.03em; font-size:clamp(38px,3.6vw,52px); line-height:1; color:var(--heading);
+    font-variant-numeric:tabular-nums; }
+
+  /* Chip del filtro activo. Es un botón: clickearlo limpia el filtro (igual que
+     volver a clickear la columna, o Esc). Ojo: limpia SÓLO el filtro del
+     usuario — el recorte de base (hunting) no se puede sacar desde la lámina,
+     es lo que la lámina es.
+
+     NO DEVOLVERLO AL FLUJO "PARA ORDENAR": va en position:absolute y se prende
+     con `visibility`, nunca con `display`, a propósito. En el flujo, aparecer y
+     desaparecer contraía el encabezado y la fila de los tres gráficos SALTABA
+     cada vez que se ponía o se sacaba un filtro. Absoluto + visibility = entra y
+     sale sin mover un píxel de las cards.
+
+     Va anclado al BORDE INFERIOR del encabezado (top:100%), no a su centro:
+     así vive siempre en la banda que separa el encabezado de las cards, por
+     debajo de la línea del título y del número, y no se descoloca la próxima vez
+     que cambie el contenido de arriba. (Cuando estaba centrado con top:50% y se
+     sacaron la nota y la glosa, el encabezado se acortó y el chip se subió
+     encima del título.) Alineado a la derecha, bajo el número: es el número el
+     que cambia cuando hay filtro puesto. */
+  .filter-chip{ position:absolute; right:0; top:100%; transform:translateY(4px);
+    display:inline-flex; align-items:center; gap:8px; visibility:hidden;
+    font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(13px,.9vw,15px);
+    padding:6px 12px; border-radius:9999px; border:1px solid var(--orange);
+    background:transparent; color:var(--orange); cursor:pointer;
+    transition:background .2s var(--ease); }
+  .filter-chip.on{ visibility:visible; }
+  .filter-chip:hover{ background:rgba(253,101,13,.10); }
+  .filter-chip .x{ font-size:15px; line-height:1; }
+
+  /* ===== Cuadrícula de gráficos =====
+     Las columnas/filas las fija el JS: con tres dimensiones (el caso normal de
+     esta lámina) va UNA sola fila de tres — una 2×2 con un hueco se lee como
+     que falta un gráfico. De cuatro para arriba vuelve a la cuadrícula. */
+  .grid{ display:grid; gap:20px; flex:1; min-height:0; }
+
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:20px; display:flex; flex-direction:column; min-height:0;
+    opacity:0; transform:translateY(16px);
+    transition:opacity .55s var(--ease), transform .55s var(--ease); }
+  .card.on{ opacity:1; transform:none; }
+  /* Una card todavía no revelada no se puede clickear aunque ocupe su lugar. */
+  .card:not(.on){ pointer-events:none; }
+
+  .card-title{ font-family:"Red Hat Display",sans-serif; font-weight:700; font-size:clamp(15px,1.05vw,17px);
+    color:var(--heading); margin-bottom:6px; flex:none; }
+
+  .chart-body{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+    overflow:hidden; }
+  /* El viewBox + preserveAspectRatio ya centran y escalan solos. */
+  .chart-svg{ width:100%; height:100%; max-height:100%; }
+
+  /* Cada columna es un grupo clickeable: el rectángulo transparente que lo
+     acompaña ocupa TODO el alto del área de dibujo, para que una barra baja
+     siga siendo fácil de apuntar en vivo. */
+  .slot{ cursor:pointer; }
+  .slot .hit{ fill:transparent; }
+  .slot:hover .bar{ opacity:.82; }
+  .slot:focus{ outline:none; }
+  .slot:focus-visible .bar{ stroke:var(--heading); stroke-width:2; }
+  /* El SVG se construye UNA vez y después sólo se le actualizan atributos, así
+     que la columna puede bajar animada al filtrar — que es justo lo que hay que
+     ver. (Si el navegador no anima propiedades geométricas de SVG, salta: se
+     degrada al comportamiento anterior, no se rompe.) */
+  .bar, .val{ transition:height .45s var(--ease), y .45s var(--ease), opacity .25s var(--ease); }
+  /* Silueta de lo que había SIN el filtro del usuario. Va como CONTORNO, no como
+     relleno: vacío contra sólido no se confunde, y de paso queda la lectura
+     correcta — "9 de los 16" es la columna llenando su propio contorno. */
+  .ghost{ opacity:.42; }
+  /* En el gráfico que origina el filtro, las columnas no elegidas se apagan. */
+  .bar.dim{ opacity:.28; }
+  /* Los tres textos del gráfico NO declaran font-size acá: se lo pone el JS
+     (FS_VAL / FS_LBL / FS_TICK) porque con ese mismo número calcula cuántos
+     caracteres entran bajo una columna. Separados, alguien sube la letra en el
+     CSS, la cuenta de caracteres se queda vieja y los rótulos se montan entre
+     ellos. Un solo número manda las dos cosas. */
+  .val{ font-family:"Inter",sans-serif; font-weight:500; fill:var(--heading);
+    font-variant-numeric:tabular-nums; }
+  .val.dim{ opacity:.35; }
+  .lbl{ font-family:"Inter",sans-serif; font-weight:400; fill:var(--secondary); }
+  .lbl.sel{ fill:var(--heading); font-weight:500; }
+  .tick{ font-family:"Inter",sans-serif; font-weight:400; fill:var(--secondary);
+    font-variant-numeric:tabular-nums; }
+
+  /* El logo del pie lo monta el shell sobre el iframe (ver .slide). Estas reglas
+     quedan heredadas de la lámina hermana para que las dos se mantengan iguales
+     si alguna vez una lámina suelta necesita traer su propia marca. */
+  .footer-logo{ position:absolute; left:clamp(40px,5vw,72px); bottom:clamp(24px,3.2vh,40px);
+    opacity:0; transition:opacity .7s var(--ease); transition-delay:.65s; }
+  .footer-logo img{ height:30px; width:auto; display:block; }
+
+  .play .kicker, .play .title, .play .head-stat, .play .footer-logo{
+    opacity:1; transform:none; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+    .kicker,.title,.head-stat,.footer-logo{ opacity:1 !important; transform:none !important; }
+  }
+
+  /* Mensaje de datos ausentes — se usa sólo si data/proceso.js no cargó. */
+  .data-error{ font-family:"Inter",sans-serif; font-size:16px; line-height:1.5;
+    color:var(--heading); padding:clamp(40px,5vw,72px); }
+</style>
+</head>
+<body>
+  <main class="slide" id="slide">
+    <div class="content">
+      <header class="head">
+        <div>
+          <!-- El kicker es constante: no depende del proceso, y es el mismo de
+               la lámina anterior porque las dos son el mismo capítulo. -->
+          <p class="kicker">Contexto del proceso de selección</p>
+          <!-- Título de la lámina: lo pinta el JS desde PROCESO.contexto.detalle. -->
+          <h1 class="title"></h1>
+        </div>
+        <div class="head-stat">
+          <!-- Tamaño del subconjunto, sin glosa: el título ya dice de quiénes se
+               está hablando. Con un filtro puesto pasa a ser el número del
+               sub-subconjunto, y el chip de abajo dice cuál es ese filtro. -->
+          <div class="stat-number"></div>
+        </div>
+        <!-- El chip cuelga del .head, no del .head-stat: así su referencia de
+             posición es el encabezado completo y no cambia cuando .head-stat
+             tiene un transform de entrada (un ancestro transformado se vuelve el
+             bloque contenedor de lo posicionado en absoluto). -->
+        <button class="filter-chip" id="filterChip" type="button"></button>
+      </header>
+
+      <div class="grid" id="grid"></div>
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      // Sin datos no hay lámina. El mensaje apunta al archivo que hay que
+      // revisar: quien edita el deck no necesariamente lee la consola.
+      if (!window.PROCESO){
+        document.body.innerHTML =
+          '<p class="data-error">data/proceso.js no cargó o tiene un error de sintaxis</p>';
+        return;
+      }
+
+      var slide = document.getElementById('slide');
+      var META = window.PROCESO.meta || {};
+      var CTX = window.PROCESO.contexto || {};
+      var DET = CTX.detalle || {};
+      var TODOS = CTX.candidatos || [];
+
+      document.title = 'Perfil de los candidatos — Presentación de candidatos · ' + (META.cargo || '');
+
+      // ===================== el recorte de base =====================
+      // `detalle.filtro` es el recorte que DEFINE esta lámina (hoy: los de
+      // hunting). No es un filtro que el usuario pueda sacar: es el universo
+      // sobre el que se cuenta todo — conteos, escala de los ejes y número
+      // grande. Se resuelve UNA vez, acá, y de aquí en adelante nadie vuelve a
+      // mirar `TODOS`. Por eso el filtro que el usuario aplica clickeando una
+      // columna se compone solo con éste y nunca puede hacer aparecer a alguien
+      // que el recorte de base dejó fuera.
+      // Si el proceso no declara `filtro`, el universo son todos los candidatos.
+      var FILTRO_BASE = DET.filtro && DET.filtro.dim ? DET.filtro : null;
+      var UNIVERSO = FILTRO_BASE
+        ? TODOS.filter(function(c){ return c[FILTRO_BASE.dim] === FILTRO_BASE.valor; })
+        : TODOS.slice();
+
+      // ===================== qué dimensiones van acá =====================
+      // Todas menos la que ya se mostró sola en la lámina anterior
+      // (`contexto.principal`) y menos aquella por la que se hizo el recorte:
+      // dentro del subconjunto esa dimensión es constante (una sola columna con
+      // el total), o sea un gráfico que no dice nada. Hoy las dos son "origen",
+      // así que quedan las tres restantes: experiencia, cargo y empresa.
+      var excluidas = {};
+      if (CTX.principal) excluidas[CTX.principal] = true;
+      if (FILTRO_BASE) excluidas[FILTRO_BASE.dim] = true;
+
+      var DIMS = (CTX.dimensiones || []).filter(function(d){ return !excluidas[d.id]; });
+      // Red de seguridad: si el proceso declaró mal `principal` y no queda
+      // ninguna, mejor repetir un gráfico que entregar una lámina en blanco.
+      if (!DIMS.length) DIMS = (CTX.dimensiones || []).slice();
+
+      function esc(s){
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+
+      // El título va como HTML porque un trozo se pinta en naranjo. Se envuelve
+      // SÓLO la primera ocurrencia de `tituloAccent`; si no aparece o no viene,
+      // el título queda entero en color de heading. El resto se escapa: el
+      // título lo escribe una persona, no es campo richtext.
+      function tituloHTML(titulo, accent){
+        var t = String(titulo == null ? '' : titulo);
+        var i = accent ? t.indexOf(accent) : -1;
+        if (i < 0) return esc(t);
+        return esc(t.slice(0, i)) +
+          '<span class="accent">' + esc(accent) + '</span>' +
+          esc(t.slice(i + String(accent).length));
+      }
+
+      // La paleta categórica vive en el CSS (--c1..--c3) y cambia con el tema:
+      // sobre navy, el navy no puede ser una serie porque se funde con el fondo.
+      // Cada valor declara un SLOT y acá se resuelve al color real.
+      var css = getComputedStyle(document.documentElement);
+      var PALETTE = {
+        c1: css.getPropertyValue('--c1').trim(),
+        c2: css.getPropertyValue('--c2').trim(),
+        c3: css.getPropertyValue('--c3').trim()
+      };
+
+      var titleEl = document.querySelector('.title');
+      var numberEl = document.querySelector('.stat-number');
+      var chipEl = document.getElementById('filterChip');
+      var gridEl = document.getElementById('grid');
+
+      // ===================== estado =====================
+      // `filtro`: el del USUARIO — {dim, valor} o null. Uno solo a la vez:
+      // encadenar filtros suena potente pero en vivo se pierde, nadie recuerda
+      // qué está aplicado. El recorte de base no vive acá porque no se apaga.
+      var filtro = null;
+      // ?at=end → el shell entró retrocediendo: la lámina se muestra completa
+      // para poder seguir devolviéndose en orden inverso.
+      var startAtEnd = new URLSearchParams(location.search).get('at') === 'end';
+      var vistos = startAtEnd ? DIMS.length : 1;
+
+      // ===================== conteo =====================
+      // De acá salen TODAS las cifras de la lámina, y siempre sobre UNIVERSO.
+      // Una fila con el dato en blanco (null) no cuenta en ESA dimensión pero sí
+      // en el total: por eso las columnas pueden sumar menos que el número
+      // grande, y está bien. (En este proceso los 31 de hunting traen la ficha
+      // completa, así que las tres dimensiones suman 31 justas.)
+      function pasaFiltro(c){
+        return !filtro || c[filtro.dim] === filtro.valor;
+      }
+
+      function contar(dimId, aplicarFiltro){
+        var out = {};
+        for (var i = 0; i < UNIVERSO.length; i++){
+          var c = UNIVERSO[i];
+          if (aplicarFiltro && !pasaFiltro(c)) continue;
+          var v = c[dimId];
+          if (v == null) continue;
+          out[v] = (out[v] || 0) + 1;
+        }
+        return out;
+      }
+
+      function totalFiltrado(){
+        if (!filtro) return UNIVERSO.length;
+        var n = 0;
+        for (var i = 0; i < UNIVERSO.length; i++) if (pasaFiltro(UNIVERSO[i])) n++;
+        return n;
+      }
+
+      // Porcentajes por RESTO MAYOR — el mismo criterio que la lámina hermana
+      // (contexto.html), a propósito: las dos se ven seguidas y tienen que
+      // repartir igual. Redondear cada columna por separado deja sumas de 99% o
+      // 101% (tres tercios dan 33+33+33=99) y en pantalla eso se lee como un
+      // error de la consultora, no como un redondeo. Acá se reparten primero los
+      // enteros y los puntos que faltan van a las columnas con mayor decimal
+      // truncado.
+      //
+      // El objetivo a repartir no es 100 fijo sino lo que representan las
+      // columnas sobre el total: si alguna fila no trae el dato de esta
+      // dimensión, las columnas no cubren el universo y el reparto tiene que
+      // sumar menos de 100. (En este proceso los 31 de hunting traen la ficha
+      // completa, así que da 100 justo.)
+      function porcentajes(valores, conteos, total){
+        var out = {};
+        var nombres = valores.map(function(v){ return v.nombre; });
+        if (!total){
+          nombres.forEach(function(n){ out[n] = 0; });
+          return out;
+        }
+
+        var suma = 0;
+        nombres.forEach(function(n){ suma += (conteos[n] || 0); });
+        var objetivo = Math.round(suma / total * 100);
+
+        var partes = nombres.map(function(n){
+          var exacto = (conteos[n] || 0) / total * 100;
+          var piso = Math.floor(exacto);
+          out[n] = piso;
+          return { nombre: n, resto: exacto - piso };
+        });
+
+        var repartido = 0;
+        nombres.forEach(function(n){ repartido += out[n]; });
+        partes.sort(function(a, b){ return b.resto - a.resto; });
+        for (var i = 0; repartido < objetivo && i < partes.length; i++, repartido++){
+          out[partes[i].nombre] += 1;
+        }
+        return out;
+      }
+
+      // ===================== forma de la cuadrícula =====================
+      // Tres gráficos → una sola fila. Cuatro → la 2×2 de siempre. Más → 3 por
+      // fila. El caso normal de esta lámina es el primero, pero la regla queda
+      // genérica: quien agregue una cuarta dimensión al proceso no tiene que
+      // venir a tocar esto.
+      var cols = DIMS.length <= 3 ? Math.max(DIMS.length, 1) : (DIMS.length <= 4 ? 2 : 3);
+      var filas = Math.ceil(DIMS.length / cols) || 1;
+      gridEl.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      gridEl.style.gridTemplateRows = 'repeat(' + filas + ', 1fr)';
+
+      // ===================== lienzo del gráfico =====================
+      // El viewBox tiene que tener EXACTAMENTE la proporción del hueco donde se
+      // dibuja. Si no, `preserveAspectRatio` (que por defecto es "meet") encoge
+      // el dibujo hasta que quepa y lo centra, dejando bandas de aire: con un
+      // lienzo estimado de 327×343 dentro de un .chart-body real de 327×566, el
+      // gráfico terminaba al 60% del alto de la card y abajo quedaba una franja
+      // vacía. Estimar la forma de la card no sirve — el alto de la fila depende
+      // del alto de la ventana (631 px a 900 de alto, no los ~394 que salían de
+      // la cuenta a 720). Así que no se estima: se MIDE la card ya montada.
+      //
+      // Bonus de medir en píxeles reales: la escala queda en 1:1, o sea que los
+      // 13 px del rótulo de la columna son 13 px de verdad en pantalla.
+      function medirLienzo(){
+        var r = cards.length ? cards[0].body.getBoundingClientRect() : null;
+        if (r && r.width > 40 && r.height > 40){
+          return { W: Math.round(r.width), H: Math.round(r.height) };
+        }
+        // Respaldo por si todavía no hay layout (iframe oculto, lámina abierta
+        // suelta): la forma aproximada de la card en 16:9. Es sólo una red —
+        // apenas haya medida real, se vuelve a montar con ella.
+        var anchoCard = (1140 - 20 * (cols - 1)) / cols - 40;   // menos padding lateral
+        var altoCard = (600 - 20 * (filas - 1)) / filas - 66;   // menos padding y título
+        return { W: Math.round(Math.max(240, anchoCard)),
+                 H: Math.round(Math.max(170, altoCard)) };
+      }
+
+      // ===================== dibujo =====================
+      // Tipografía del gráfico, en píxeles REALES: como el viewBox se mide del
+      // .chart-body (ver medirLienzo), una unidad de usuario es un píxel de
+      // pantalla, así que estos números son el tamaño que se ve. Piso de la
+      // política del deck: ningún texto visible bajo 12 px.
+      var FS_VAL = 15;    // el número sobre la columna: es el dato, manda
+      var FS_LBL = 14;    // el nombre de la categoría, bajo el eje
+      var FS_TICK = 13;   // los cortes del eje Y, el texto más de servicio
+      // Van fijos y no con clamp como los del encabezado: la card no se ensancha
+      // nunca (el contenedor tope a 1140 px, o sea ~327 por gráfico), así que
+      // agrandar el rótulo en una pantalla más grande sólo lo acercaría al
+      // vecino. Lo que crece con la pantalla es el ALTO, y eso ya lo aprovechan
+      // las columnas.
+      // Ancho promedio de carácter de Inter, en fracción del cuerpo. Se usa para
+      // saber cuántos caracteres entran bajo una columna; 0.55 está calibrado
+      // con los rótulos largos reales ("ONGs/Sector", "Consultoras/"). Si algún
+      // día se cambia la familia, este número se recalibra.
+      var ANCHO_CHAR = 0.55;
+
+      function svgNodo(tag, attrs, texto){
+        var n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        for (var k in attrs){ if (attrs[k] != null) n.setAttribute(k, attrs[k]); }
+        if (texto != null) n.textContent = texto;
+        return n;
+      }
+
+      // Paso de la escala Y: el menor de 1/2/5 × 10ⁿ que deja como máximo 4
+      // divisiones. Así los rótulos del eje son siempre cifras redondas
+      // (0-5-10-15) en vez de los repartos feos que salen de dividir el máximo
+      // real en partes iguales.
+      function pasoEscala(vmax){
+        var bases = [1, 2, 5];
+        for (var e = 0; e < 9; e++){
+          for (var i = 0; i < bases.length; i++){
+            var paso = bases[i] * Math.pow(10, e);
+            if (vmax / paso <= 4) return paso;
+          }
+        }
+        return Math.ceil(vmax / 4) || 1;
+      }
+
+      // ===================== escala compartida =====================
+      // UNA sola escala Y para TODOS los gráficos de la lámina, calculada con el
+      // máximo de todas las dimensiones visibles (hoy 16 → 0-20 de 5 en 5).
+      //
+      // NO ES UN DETALLE Y NO SE "ARREGLA" DÁNDOLE A CADA GRÁFICO SU PROPIA
+      // ESCALA: son small multiples — mismo tamaño, uno al lado del otro, mismo
+      // universo de 31 personas — y por eso el ojo los lee como comparables. Con
+      // escalas propias, una columna de 12 sobre eje 0-15 se ve MÁS ALTA que una
+      // de 14 sobre eje 0-20, y la lámina miente sin que nadie lo note.
+      //
+      // Se calcula SIN el filtro del usuario, igual que la silueta: si se
+      // reescalara con el subconjunto, las columnas filtradas volverían a llenar
+      // el gráfico y el filtro no se notaría.
+      var vmaxGlobal = DIMS.reduce(function(m, d){
+        var cuenta = contar(d.id, false);
+        return d.valores.reduce(function(mm, v){
+          return Math.max(mm, cuenta[v.nombre] || 0);
+        }, m);
+      }, 0);
+      var PASO = pasoEscala(vmaxGlobal || 1);
+      var MAX_Y = Math.max(PASO, Math.ceil(vmaxGlobal / PASO) * PASO);
+
+      // Une dos trozos de rótulo: espacio en medio, salvo que el de la izquierda
+      // cierre en barra — ahí van pegados ("ONGs/" + "Sector" = "ONGs/Sector").
+      function unir(a, b){ return a + (/\/$/.test(a) ? '' : ' ') + b; }
+
+      // Parte un rótulo largo en máximo 2 líneas para que quepa bajo su columna.
+      // A diferencia de la lámina hermana, acá también se puede cortar DESPUÉS
+      // de una barra: con tres gráficos en una fila la ranura es angosta y
+      // "Consultoras/Privado" no tiene ni un espacio donde partirse — de una
+      // sola línea se le monta encima al rótulo vecino.
+      function partirRotulo(texto, maxChars){
+        var tokens = [];
+        String(texto).split(' ').forEach(function(palabra){
+          var partes = palabra.split('/');
+          partes.forEach(function(t, i){
+            // la barra se queda pegada al trozo de la izquierda
+            tokens.push(i < partes.length - 1 ? t + '/' : t);
+          });
+        });
+
+        var lineas = [];
+        tokens.forEach(function(t){
+          if (!t) return;
+          if (!lineas.length){ lineas.push(t); return; }
+          var actual = lineas[lineas.length - 1];
+          if (unir(actual, t).length <= maxChars) lineas[lineas.length - 1] = unir(actual, t);
+          else lineas.push(t);
+        });
+        if (!lineas.length) return [''];
+
+        if (lineas.length > 2){
+          lineas = [lineas[0], lineas.slice(1).reduce(function(a, b){ return unir(a, b); })];
+          if (lineas[1].length > maxChars) lineas[1] = lineas[1].slice(0, maxChars - 1) + '…';
+        }
+        return lineas;
+      }
+
+      // Columnas CON EJE Y ROTULADO. El eje arranca SIEMPRE en 0 (truncarlo
+      // exagera diferencias) y usa la escala COMPARTIDA de más arriba, que es la
+      // misma para las tres cards.
+      //
+      // Devuelve { svg, actualizar }. Todo lo que no cambia nunca (grilla,
+      // escala, rótulos, áreas de clic) se dibuja acá una sola vez; `actualizar`
+      // sólo mueve las columnas. Así el filtro ANIMA en vez de saltar.
+      function crearGrafico(dim, lienzo){
+        var W = lienzo.W, H = lienzo.H;
+        // Márgenes del área de dibujo, ajustados a la tipografía de arriba:
+        // - abajo 50: dos líneas de rótulo a 14 px (líneas base en +20 y +37,
+        //   más el descendente) necesitan más que los 42 que bastaban a 12 px.
+        //   La instrucción es clara: si el rótulo crece, crece el margen — no se
+        //   achica la letra.
+        // - izquierda 36 y derecha 6: se le devuelve ancho a la ranura para que
+        //   los rótulos más grandes no se toquen. Alcanza de sobra: el corte más
+        //   largo del eje ("300" a 13 px) mide ~24 px y quedan 8 de aire.
+        var M = { arriba: 24, derecha: 6, abajo: 50, izquierda: 36 };
+        var plotL = M.izquierda, plotR = W - M.derecha;
+        var plotT = M.arriba, plotB = H - M.abajo;
+        var plotW = plotR - plotL, plotH = plotB - plotT;
+
+        var svg = svgNodo('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart-svg' });
+
+        // Conteo sin el filtro del usuario: es la silueta de referencia. No
+        // cambia nunca, por eso se calcula una vez.
+        var base = contar(dim.id, false);
+
+        // MAX_Y y PASO son de la lámina entera, no de este gráfico: ver el
+        // bloque "escala compartida". El máximo de ESTA dimensión no se usa.
+        function alto(n){ return MAX_Y ? (n / MAX_Y) * plotH : 0; }
+
+        // Grilla horizontal + rótulos del eje Y. Sólo líneas en los valores
+        // rotulados: cada línea de más es tinta que no aporta lectura.
+        for (var v = 0; v <= MAX_Y; v += PASO){
+          var y = plotB - alto(v);
+          svg.appendChild(svgNodo('line', {
+            x1: plotL, y1: y, x2: plotR, y2: y,
+            stroke: v === 0 ? 'var(--gray)' : 'var(--border)', 'stroke-width': 1
+          }));
+          svg.appendChild(svgNodo('text', {
+            x: plotL - 8, y: y, 'text-anchor': 'end', 'dominant-baseline': 'middle',
+            class: 'tick', 'font-size': FS_TICK
+          }, v));
+        }
+
+        // Una ranura por valor: el grupo queda centrado solo, con 2, 3 o 4
+        // columnas, sin cálculos de offset a mano.
+        var ranura = plotW / dim.valores.length;
+        // 0.62 de la ranura (no 0.5 como en la lámina hermana): acá las cards
+        // son un tercio de ancho y bien altas, así que con la mitad justa las
+        // columnas quedaban hilos. El tope absoluto evita que con dos categorías
+        // salga una columna gigante.
+        var anchoCol = Math.min(88, ranura * 0.62);
+        // Cuántos caracteres entran bajo una columna: sale del cuerpo REAL del
+        // rótulo, no de una constante suelta. Con la ranura angosta de tres
+        // gráficos en fila esto es lo que decide si "ONGs/Sector público" se
+        // parte bien o se le monta encima al vecino.
+        var maxChars = Math.max(6, Math.floor(ranura / (FS_LBL * ANCHO_CHAR)));
+
+        // Qué dice el rótulo de una columna: el PORCENTAJE mientras nadie la
+        // apunta, y el NÚMERO REAL cuando el mouse pasa por encima o cuando se
+        // la enfoca con el teclado. El porcentaje es lo que se lee de una pasada
+        // en una presentación; la cifra exacta es lo que pregunta el cliente
+        // cuando algo le llama la atención, y queda a un gesto de distancia.
+        // Ojo: acá sólo cambia el TEXTO. La posición del rótulo la fija la
+        // altura de la barra (ver `actualizar`), nunca el largo de lo que dice,
+        // así que pasar el mouse no mueve nada de lugar.
+        function pintarRotulo(p){
+          p.txt.textContent = p.hover ? p.nReal : (p.pct + '%');
+        }
+
+        var piezas = dim.valores.map(function(val, i){
+          var centro = plotL + ranura * (i + 0.5);
+          var nBase = base[val.nombre] || 0;
+          var hBase = alto(nBase);
+          var x = centro - anchoCol / 2;
+
+          var g = svgNodo('g', { class: 'slot', role: 'button', tabindex: 0 });
+
+          // Área de clic: toda la altura de la ranura. Una columna baja es una
+          // línea de pocos píxeles — imposible de apuntar en vivo si el blanco
+          // fuera la barra misma.
+          g.appendChild(svgNodo('rect', {
+            class: 'hit', x: centro - ranura / 2, y: plotT,
+            width: ranura, height: plotH + M.abajo - 8
+          }));
+
+          // Silueta de lo que había sin el filtro del usuario. Se dibuja siempre
+          // y se enciende sólo cuando hay algo que mostrar.
+          var ghost = svgNodo('rect', {
+            class: 'ghost', x: x, y: plotB - hBase,
+            width: anchoCol, height: hBase, fill: 'none',
+            stroke: PALETTE[val.slot], 'stroke-width': 1.25, rx: 4
+          });
+          g.appendChild(ghost);
+
+          var bar = svgNodo('rect', {
+            class: 'bar', x: x, y: plotB - hBase, width: anchoCol, height: hBase,
+            fill: PALETTE[val.slot], rx: 4
+          });
+          g.appendChild(bar);
+
+          // Valor sobre la columna (Inter 500, según §7.2 del brandbook).
+          var valTxt = svgNodo('text', {
+            class: 'val', x: centro, y: plotB - hBase - 8, 'text-anchor': 'middle',
+            'font-size': FS_VAL
+          }, nBase);
+          g.appendChild(valTxt);
+
+          // Nombre bajo el eje, hasta en dos líneas. El interlineado sale del
+          // cuerpo del rótulo (1.2), no de un 14 fijo que se quedaría corto
+          // cuando la letra sube.
+          var lbls = partirRotulo(val.nombre, maxChars).map(function(linea, li){
+            var t = svgNodo('text', {
+              class: 'lbl', x: centro, y: plotB + 20 + li * Math.round(FS_LBL * 1.2),
+              'text-anchor': 'middle', 'font-size': FS_LBL
+            }, linea);
+            g.appendChild(t);
+            return t;
+          });
+
+          var pieza = { val: val, g: g, bar: bar, ghost: ghost, txt: valTxt,
+                        lbls: lbls, nBase: nBase,
+                        hover: false, nReal: nBase, pct: 0 };
+
+          g.addEventListener('click', function(){ alternarFiltro(dim.id, val.nombre); });
+          g.addEventListener('keydown', function(e){
+            if (e.key === 'Enter' || e.key === ' '){
+              e.preventDefault();
+              alternarFiltro(dim.id, val.nombre);
+            }
+          });
+
+          // Mouse y teclado hacen lo mismo: la columna ya era focuseable para
+          // poder filtrarla con Enter, así que enfocarla también destapa la
+          // cifra. (mouseenter/mouseleave y no mouseover/mouseout: éstos últimos
+          // se disparan de nuevo al cruzar entre los hijos del grupo — barra,
+          // rótulo, área de clic — y el número parpadearía.)
+          ['mouseenter', 'focus'].forEach(function(ev){
+            g.addEventListener(ev, function(){ pieza.hover = true; pintarRotulo(pieza); });
+          });
+          ['mouseleave', 'blur'].forEach(function(ev){
+            g.addEventListener(ev, function(){ pieza.hover = false; pintarRotulo(pieza); });
+          });
+
+          svg.appendChild(g);
+          return pieza;
+        });
+
+        function actualizar(){
+          var esOrigen = !!filtro && filtro.dim === dim.id;
+          // El gráfico que ORIGINA el filtro se sigue mostrando entero: es la
+          // referencia de dónde salió el subconjunto. Los demás se recalculan.
+          var actual = esOrigen ? base : contar(dim.id, true);
+
+          // Denominador del porcentaje: el universo que ESTE gráfico está
+          // mostrando en este momento — los 31 sin filtro, y el subconjunto
+          // cuando hay uno puesto. El porcentaje tiene que responder a "de los
+          // que estoy mirando ahora"; medirlo siempre contra un total invisible
+          // (los 245, o los 31 cuando ya se filtró) diría otra cosa que la que
+          // muestran las barras.
+          //
+          // El gráfico que ORIGINA el filtro es la excepción, igual que con los
+          // conteos: sigue mostrando su reparto completo sobre los 31, porque es
+          // la referencia de DÓNDE salió el subconjunto. Medirlo contra el
+          // subconjunto daría 100% en la columna elegida y 0% en las demás — no
+          // sería falso, pero no diría nada.
+          var denom = esOrigen ? UNIVERSO.length : totalFiltrado();
+          var pcts = porcentajes(dim.valores, actual, denom);
+
+          piezas.forEach(function(p){
+            var seleccionado = esOrigen && !!filtro && filtro.valor === p.val.nombre;
+            var descartado = esOrigen && !!filtro && !seleccionado;
+
+            // Un solo lenguaje en los tres gráficos: SÓLIDO es lo que pasa el
+            // filtro, CONTORNO es lo que quedó fuera. Por eso en el gráfico que
+            // origina el filtro las columnas no elegidas se vacían enteras en
+            // vez de apagarse — apagadas se veían como un relleno turbio y
+            // parecían otra categoría de dato.
+            var nSolido = esOrigen ? (seleccionado ? p.nBase : 0)
+                                   : (actual[p.val.nombre] || 0);
+            var h = alto(nSolido);
+
+            // El número que se muestra: en los gráficos filtrados es el del
+            // subconjunto; en el que origina el filtro es su cifra real (la
+            // columna descartada sigue valiendo lo que valía, no 0).
+            var nRotulo = esOrigen ? p.nBase : nSolido;
+            var yRotulo = plotB - alto(nRotulo) - 8;
+
+            p.bar.setAttribute('y', plotB - h);
+            p.bar.setAttribute('height', h);
+
+            p.ghost.style.display = (!!filtro && p.nBase > nSolido) ? '' : 'none';
+
+            // La Y sale de la altura de la barra, no del texto: por eso el
+            // rótulo no se mueve cuando el hover lo cambia de "52%" a "16".
+            p.txt.setAttribute('y', yRotulo);
+            p.nReal = nRotulo;
+            p.pct = pcts[p.val.nombre] || 0;
+            pintarRotulo(p);
+            p.txt.classList.toggle('dim', descartado);
+
+            p.lbls.forEach(function(t){ t.classList.toggle('sel', seleccionado); });
+            // El lector de pantalla no tiene hover: le van las dos cifras. El
+            // "de N" es el universo de ESTE gráfico, no los 245 — decir "de 245"
+            // acá sería el error que la lámina entera viene a evitar.
+            p.g.setAttribute('aria-label',
+              p.val.nombre + ': ' + p.pct + '%, ' + nRotulo + ' de ' + denom + ' candidatos');
+          });
+        }
+
+        return { svg: svg, actualizar: actualizar };
+      }
+
+      // ===================== render =====================
+      // Las cards se montan VACÍAS primero: recién cuando están en el documento
+      // se puede medir el hueco del gráfico (ver medirLienzo). Después se les
+      // cuelga el SVG.
+      var cardsHechas = 0;
+      var cards = DIMS.map(function(dim){
+        var card = document.createElement('div');
+        card.className = 'card';
+        // Cascada de entrada. Se limpia apenas termina (más abajo): un gráfico
+        // revelado DESPUÉS con la flecha tiene que aparecer al tiro, no con
+        // medio segundo de espera.
+        card.style.transitionDelay = (0.34 + cardsHechas++ * 0.10) + 's';
+        var h = document.createElement('p');
+        h.className = 'card-title';
+        h.textContent = dim.titulo || dim.id;
+        var body = document.createElement('div');
+        body.className = 'chart-body';
+        card.appendChild(h);
+        card.appendChild(body);
+        gridEl.appendChild(card);
+        return { dim: dim, el: card, body: body, graf: null };
+      });
+
+      var LIENZO = null;
+
+      function montarGraficos(){
+        LIENZO = medirLienzo();
+        cards.forEach(function(c){
+          while (c.body.firstChild) c.body.removeChild(c.body.firstChild);
+          c.graf = crearGrafico(c.dim, LIENZO);
+          c.body.appendChild(c.graf.svg);
+        });
+      }
+
+      // El iframe de la lámina ocupa toda la ventana (ver deck.html), así que
+      // entrar a pantalla completa o cambiar el tamaño del navegador cambia la
+      // forma de la card — y con ella la proporción del lienzo. Se vuelve a
+      // medir y a dibujar. El estado (filtro puesto, cards reveladas) vive
+      // afuera de los gráficos, así que no se pierde nada al reconstruirlos.
+      function reajustar(){
+        var l = medirLienzo();
+        if (LIENZO && Math.abs(l.W - LIENZO.W) < 2 && Math.abs(l.H - LIENZO.H) < 2) return;
+        montarGraficos();
+        render();
+      }
+
+      var pendiente = null;
+      window.addEventListener('resize', function(){
+        if (pendiente) cancelAnimationFrame(pendiente);
+        pendiente = requestAnimationFrame(function(){ pendiente = null; reajustar(); });
+      });
+
+      // Las fuentes llegan por <link> y pueden cambiar el alto del título de la
+      // card después del primer layout — unos pocos píxeles, pero suficientes
+      // para descuadrar el lienzo. Cuando terminen de cargar, se remide.
+      if (document.fonts && document.fonts.ready && document.fonts.ready.then){
+        document.fonts.ready.then(reajustar).catch(function(){});
+      }
+
+      function render(){
+        var nFiltrado = totalFiltrado();
+
+        // El número grande y nada más: es el tamaño del subconjunto de la lámina
+        // (31), y con un filtro puesto el del sub-subconjunto. Iba acompañado de
+        // una glosa ("de 245 · Candidatos por hunting") que se sacó — el título
+        // ya dice de quiénes se está hablando y el chip dice qué filtro está
+        // puesto, así que la glosa repetía en chico lo que ya estaba dicho.
+        numberEl.textContent = nFiltrado;
+
+        chipEl.classList.toggle('on', !!filtro);
+        if (filtro){
+          chipEl.innerHTML = '<span>' + esc(filtro.valor) + '</span><span class="x">×</span>';
+        }
+
+        cards.forEach(function(c, i){
+          c.el.classList.toggle('on', i < vistos);
+          c.graf.actualizar();
+        });
+      }
+
+      function alternarFiltro(dimId, valor){
+        if (filtro && filtro.dim === dimId && filtro.valor === valor) filtro = null;
+        else filtro = { dim: dimId, valor: valor };
+        render();
+      }
+
+      chipEl.addEventListener('click', function(){ filtro = null; render(); });
+      document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape' && filtro){ filtro = null; render(); }
+      });
+
+      titleEl.innerHTML = tituloHTML(DET.titulo || CTX.titulo, DET.tituloAccent);
+
+      // El DOM se construye ANTES de disparar la coreografía: las transiciones
+      // de .play tienen que ver el contenido final, no los contenedores vacíos.
+      // Y los gráficos se montan DESPUÉS de escribir el título, no antes: el alto
+      // del encabezado es el que decide cuánto le queda a la fila de cards, y es
+      // ese hueco el que se mide para armar el lienzo.
+      montarGraficos();
+      render();
+
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){ slide.classList.add('play'); });
+      });
+
+      // Terminada la entrada, se sueltan los retardos: de ahí en adelante cada
+      // gráfico que se revela con la flecha aparece inmediato.
+      setTimeout(function(){
+        cards.forEach(function(c){ c.el.style.transitionDelay = '0s'; });
+      }, 1200);
+
+      // Cada flecha revela el siguiente gráfico; los anteriores se quedan. Al
+      // devolverse se esconde el último y, si el filtro lo originaba un gráfico
+      // que dejó de verse, se limpia — un filtro invisible es un filtro que se
+      // olvida puesto.
+      window.deckStep = function(dir){
+        if (dir > 0 && vistos < DIMS.length){ vistos++; render(); return true; }
+        if (dir < 0 && vistos > 1){
+          vistos--;
+          if (filtro){
+            var idx = DIMS.findIndex(function(d){ return d.id === filtro.dim; });
+            if (idx >= vistos) filtro = null;
+          }
+          render();
+          return true;
+        }
+        return false;
+      };
+    })();
+  </script>
+</body>
+</html>

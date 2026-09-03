@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presentación de candidatos — divisor</title>
+<!-- Divisor de sección entre el contexto del proceso (s01, fondo claro) y las
+     láminas de perfil (navy). Existe para dar respiración: el nombre de la
+     primera candidata ya no aparece "de la nada".
+     Coreografía: titular gigante → línea peach que se dibuja → los nombres de
+     los finalistas entran en cascada.
+     Lo único variable de esta lámina es esa fila de nombres, que sale de
+     PROCESO.candidatos[].pila; el titular es fijo de la plantilla.
+
+     Antes había un kicker Dongra ("Los finalistas") sobre el titular. Se sacó:
+     decía lo mismo que la fila de nombres de abajo y empujaba el bloque fuera
+     de eje. La lámina quedó con una sola voz. -->
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Los datos del proceso. Carga síncrona y por ruta relativa a propósito: así
+     el deck funciona abierto con doble clic (file://), sin servidor. -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== TEMA ===== ver nota en s02: literales de marca + tokens por tema. */
+  :root{
+    --navy:#1E2D3B; --orange:#FD650D; --white:#FFFFFF;
+
+    --bg:#1E2D3B; --peach:#FFAE7F; --ink:#FFFFFF;
+    --w75:rgba(255,255,255,.75); --w45:rgba(255,255,255,.45);
+    --sep:rgba(255,174,127,.3);
+    --iso-op:.07;                         /* el isotipo de fondo pide menos peso sobre claro */
+
+    --ease:cubic-bezier(.22,1,.36,1);
+    --edge-x:19%;                         /* mismo margen que la portada */
+  }
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --peach:#B34A09; --ink:#1E2D3B;
+    --w75:#4A5563; --w45:#A8B0BA;
+    --sep:rgba(253,101,13,.32);
+    --iso-op:.05;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:var(--bg); }
+  body{ font-family:"Inter",sans-serif; color:var(--ink); -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  .slide{ position:relative; width:100vw; height:100vh; background:var(--bg);
+    display:flex; flex-direction:column; justify-content:center;
+    padding:clamp(40px,5vw,80px) var(--edge-x); overflow:hidden; }
+
+  /* Isotipo grande a la derecha, muy tenue — presencia de marca sin ruido. */
+  .iso{ position:absolute; right:calc(var(--edge-x) * .55); top:50%;
+    width:clamp(200px,26vw,360px); height:clamp(200px,26vw,360px);
+    transform:translateY(-50%); pointer-events:none; z-index:1;
+    opacity:0; transition:opacity 1.2s var(--ease); transition-delay:.5s; }
+  .play .iso{ opacity:var(--iso-op); }
+  .iso svg{ width:100%; height:100%; display:block; }
+
+  .inner{ position:relative; z-index:2; max-width:70%; container-type:inline-size; }
+
+  .titulo{ font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(38px,11cqw,76px); line-height:1.04; letter-spacing:-.02em;
+    color:var(--ink); }
+  .titulo .accent{ color:var(--orange); }
+
+  /* Línea peach que se dibuja: mismo gesto que abre el arco en las láminas de perfil. */
+  .rule{ height:1.5px; background:var(--peach); margin-top:clamp(20px,3vh,30px);
+    transform:scaleX(0); transform-origin:left;
+    transition:transform .8s var(--ease); }
+  .play .rule{ transform:scaleX(1); transition-delay:.9s; }
+
+  /* Piso 11→13 px y techo 14→16: en una lámina que se proyecta sin escalado,
+     11 px son 11 px reales, y el techo de 14 dejaba la fila igual de chica en
+     un 4K que en un notebook. El término del medio sube en la misma proporción
+     (1.6→1.9cqw) para que el tramo intermedio no se salte.
+     `white-space:nowrap` se mantiene (ningún nombre se parte por la mitad),
+     pero `flex-wrap` pasa a `wrap`: la fila crece con la cantidad de finalistas
+     y, si no cabe, se parte ENTRE nombres en vez de irse por fuera del bloque.
+     Cálculo: con los 5 del mockup la fila mide ~33em (≈520 px a 15.8 px en
+     1920, ≈425 px a 13 px en 1280) contra un contenedor de 833/555 px → entra
+     holgada en una línea. Con 8 nombres pide ~59em, que no cabe en una línea a
+     ningún tamaño ≥12 px; ahí baja a dos líneas, que es lo correcto: bajar de
+     12 px sería volver al problema que estamos arreglando.
+     El row-gap va aparte (.5em) para que esas dos líneas no queden despegadas. */
+  .nombres{ display:flex; flex-wrap:wrap; white-space:nowrap; align-items:center; gap:.5em .9em;
+    font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(13px,1.9cqw,16px);
+    letter-spacing:.12em; text-transform:uppercase; color:var(--w45);
+    margin-top:clamp(20px,3vh,30px); }
+  /* El separador es un ::before del nombre, NO un <span> aparte: con el punto
+     como elemento propio, el JS tendría que intercalar separadores y saltárselos
+     al numerar la cascada. Así cada `.n` es un nombre y el punto viaja con él. */
+  .nombres .n{ opacity:0; transform:translateY(8px);
+    transition:opacity .5s var(--ease), transform .5s var(--ease); }
+  .nombres .n + .n::before{ content:"·"; margin-right:.9em;
+    color:var(--sep); font-weight:700; }
+  .play .nombres .n{ opacity:1; transform:none; }
+  /* El stagger de los nombres NO vive acá: el JS escribe un transition-delay
+     inline por nombre al construir la fila (1.25s + .12s cada uno), para que
+     funcione con 3 finalistas o con 8 sin una regla nth-child por cada uno.
+     Ese delay inline queda aplicado siempre, no solo a la entrada; pero esta
+     lámina no tiene pasos reversibles ni hover sobre los nombres, así que no
+     hay ninguna otra transición a la que pueda meterle retardo. */
+
+  /* Entrada */
+  .titulo{ opacity:0; transform:translateY(16px);
+    transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .play .titulo{ opacity:1; transform:none; transition-delay:.2s; }
+
+  .footlogo{ position:absolute; left:var(--edge-x); bottom:clamp(30px,4vh,44px);
+    opacity:0; transition:opacity .7s var(--ease); transition-delay:2.1s; z-index:2; }
+  .play .footlogo{ opacity:.85; }
+  .footlogo img{ height:30px; width:auto; display:block; }
+
+  /* Aviso de datos: solo aparece si proceso.js no cargó. */
+  .datos-error{ padding:clamp(40px,6vw,80px); font-family:"Inter",sans-serif;
+    font-size:clamp(16px,2vw,20px); line-height:1.5; color:var(--ink); }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+    .titulo,.nombres .n,.footlogo{ opacity:1 !important; transform:none !important; }
+    .rule{ transform:scaleX(1) !important; }
+    .iso{ opacity:var(--iso-op) !important; transform:translateY(-50%) !important; }
+  }
+</style>
+</head>
+<body>
+  <main class="slide" id="slide">
+    <div class="iso" aria-hidden="true">
+      <svg viewBox="0 0 162.12 162.12">
+        <circle fill="#FD650D" cx="81.06" cy="81.06" r="81.06"/>
+        <!-- Las formas internas se pintan del color del fondo: así el isotipo
+             se "recorta" del disco naranjo en cualquiera de los dos temas. -->
+        <g fill="var(--bg)">
+          <circle cx="29.51" cy="102.6" r="19.33"/>
+          <path d="M53.88,29.01l-21,36.37,32.56,48.23c3.65,5.41,9.61,8.33,15.68,8.33,3.64,0,7.32-1.05,10.56-3.24,8.65-5.84,10.93-17.59,5.09-26.24l-42.89-63.45Z"/>
+          <path d="M106.94,29.01l-21,36.37,32.56,48.23c3.65,5.41,9.61,8.33,15.68,8.33,3.64,0,7.32-1.05,10.56-3.24,8.65-5.84,10.93-17.59,5.09-26.24l-42.89-63.45Z"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="inner">
+      <!-- El titular es constante de la plantilla: no depende del proceso. -->
+      <h1 class="titulo">Presentación de <span class="accent">candidatos</span>.</h1>
+      <div class="rule"></div>
+      <!-- La fila la llena el script con PROCESO.candidatos[].pila. -->
+      <div class="nombres" id="nombres"></div>
+    </div>
+
+  </main>
+
+  <script>
+    (function(){
+      var P = window.PROCESO;
+
+      /* proceso.js se carga síncrono en el <head>: si acá no existe, el archivo
+         no está donde corresponde o tiene un error de sintaxis. Mensaje directo
+         y sin jerga, porque quien arma el deck no es técnica. */
+      if(!P){
+        document.body.innerHTML =
+          '<div class="datos-error">data/proceso.js no cargó o tiene un error de sintaxis</div>';
+        return;
+      }
+
+      document.title = 'Presentación de candidatos — divisor · ' + P.meta.cargo;
+
+      /* El DOM se construye ANTES de encender .play: la cascada es un
+         transition sobre elementos que ya tienen que existir en el primer
+         frame, si no, entran todos de golpe. */
+      var fila = document.getElementById('nombres');
+      (P.candidatos || []).forEach(function(c, i){
+        var el = document.createElement('span');
+        el.className = 'n';
+        el.textContent = c.pila;
+        // 1.25s de arranque (justo después de que se dibuja la línea) + .12s por nombre.
+        el.style.transitionDelay = (1.25 + i * 0.12).toFixed(2) + 's';
+        fila.appendChild(el);
+      });
+
+      var slide = document.getElementById('slide');
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){ slide.classList.add('play'); });
+      });
+    })();
+  </script>
+</body>
+</html>

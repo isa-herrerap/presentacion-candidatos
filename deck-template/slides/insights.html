@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- El título definitivo lo arma el render con el cargo de PROCESO.meta. -->
+<title>Insights de la búsqueda — Presentación de candidatos</title>
+<!-- Lo que la búsqueda dejó a la vista, en 3 pasos de coreografía. Va ANTES de
+     los candidatos (justo después del contexto y antes del divisor): es el
+     encuadre con el que el cliente mira las fichas que vienen, no un cierre.
+     Antes era la última lámina y se llamaba "Conclusiones del proceso"; se
+     movió acá porque los veredictos de renta y de perfil explican lo que se
+     va a ver, y leerlos después de decidir llegaba tarde.
+     1) los dos veredictos duros (renta y funciones) con check/equis,
+     2) los principales motivos de descarte (no interés + descarte del analista),
+     3) insights del mercado — lo que el cliente necesita saber.
+     Los otros dos bloques que tenía se fueron: "qué busca quien sí está
+     interesado" se eliminó del contrato, y los próximos pasos son hoy su
+     propia lámina de cierre (pasos.html).
+     Plantilla fija: todo el texto variable sale de PROCESO.conclusion
+     (data/proceso.js); lo constante (kicker, título, títulos de columna) vive
+     acá en el HTML.
+     El logo lo pone el shell (deck.html), por eso acá sólo se reserva la banda
+     inferior con padding. Soporta ?at=end para entrar retrocediendo. -->
+<!-- data-theme-init: el tema llega por ?theme= desde el shell. Se aplica ANTES
+     de pintar para que no haya un flash del tema contrario. -->
+<script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"dark";</script>
+<!-- Datos del proceso. Carga síncrona y con ruta relativa: así funciona abriendo
+     el archivo directo por file://, sin servidor. -->
+<script src="../data/proceso.js"></script>
+<!-- Puente de navegación con el shell (postMessage). Ver _nav.js. -->
+<script src="_nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== TEMA ===== literales de marca + tokens que cambian por tema.
+     El peach es tinta sólo sobre oscuro; en claro pasa al naranjo profundo. */
+  :root{
+    --navy:#1E2D3B; --orange:#FD650D; --white:#FFFFFF;
+
+    --bg:#1E2D3B; --elev:#313E4B; --peach:#FFAE7F;
+    --ink:#FFFFFF;
+    --w80:rgba(255,255,255,.80); --w75:rgba(255,255,255,.75); --w55:rgba(255,255,255,.55);
+    --w45:rgba(255,255,255,.45);
+    --hair12:rgba(255,255,255,.12); --hair08:rgba(255,255,255,.08);
+    --mark-ink:#1E2D3B;                       /* tinta dentro del ✓ sólido */
+
+    --ease:cubic-bezier(.22,1,.36,1);
+    --eoq:cubic-bezier(.23,1,.32,1);
+  }
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --elev:#F3F5F9; --peach:#B34A09;
+    --ink:#1E2D3B;
+    --w80:#333333; --w75:#4A5563; --w55:#717E8E; --w45:#A8B0BA;
+    --hair12:#E8EAED; --hair08:#EEF0F3;
+    --mark-ink:#FFFFFF;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:var(--bg); }
+  body{ font-family:"Inter",sans-serif; color:var(--ink); -webkit-font-smoothing:antialiased; overflow:hidden; }
+
+  /* ===== PISO TIPOGRÁFICO =====
+     La lámina se proyecta a pantalla completa y SIN escalado: 1 px de CSS es
+     1 px real en la pared. Por eso acá ningún texto visible baja de 12 px.
+     Lo importante: el problema no era el piso, era el TECHO de los clamp().
+     Subir sólo el mínimo no arregla nada, porque en pantalla grande manda el
+     máximo — un clamp(9.5px,1.3vh,11px) se queda pegado en 11 px aunque
+     proyectes en 4K. Regla: cada vez que sube el piso, sube el techo en la
+     misma proporción (y el término vh en el medio, para no saltarse tramos).
+     Escala de referencia de esta lámina:
+       versalita / micro-etiqueta  12 → 13.5-14
+       glosa, apoyo, metadato      13 → 16
+       ítem de lista (cuerpo)      14.5 → 17.5 */
+
+  /* padding-bottom reserva la banda del logo del shell (abajo a la izquierda). */
+  .slide{ position:relative; width:100vw; height:100vh; background:var(--bg);
+    display:flex; flex-direction:column;
+    padding:clamp(30px,4.5vh,52px) clamp(40px,4vw,64px) clamp(64px,9vh,84px);
+    overflow:hidden; }
+
+  /* ===== Encabezado ===== */
+  .head{ flex:0 0 auto; }
+  /* Mismo kicker que contexto.html y contexto-detalle.html (versalita en Red Hat
+     Display, no la itálica de Dongra): las tres láminas van seguidas y comparten
+     el rótulo "Contexto del proceso de selección". Con dos tratamientos
+     distintos para el mismo texto, el cambio se lee como error. */
+  .kicker{ font-family:"Red Hat Display",sans-serif; font-weight:700;
+    font-size:clamp(12px,.9vw,14px); text-transform:uppercase; letter-spacing:1.5px;
+    color:var(--peach); margin-bottom:8px;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .play .kicker{ opacity:1; transform:none; transition-delay:.12s; }
+  .title{ margin-top:4px; font-family:"Red Hat Display",sans-serif; font-weight:800;
+    font-size:clamp(28px,4.4vh,44px); line-height:1.05; letter-spacing:-.02em; color:var(--ink);
+    opacity:0; transform:translateY(14px);
+    transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .play .title{ opacity:1; transform:none; transition-delay:.22s; }
+  .title .accent{ color:var(--orange); }
+
+  /* ===== Fila 1 — los dos veredictos duros ===== */
+  /* El bloque (veredictos → columnas) viaja junto y se centra en el alto que
+     sobra bajo el título: `margin-top:auto` en los veredictos y
+     `margin-bottom:auto` en las columnas reparten el sobrante mitad arriba y
+     mitad abajo, en vez de dejarlo todo en un extremo. Que ninguna de las dos
+     filas se estire es lo que mantiene el bloque contiguo. */
+  .verdicts{ flex:0 0 auto; display:flex; gap:clamp(12px,1.5vw,18px);
+    margin-top:auto; padding-top:clamp(14px,2.4vh,24px); }
+  .verdict{ flex:1 1 0; min-width:0; display:flex; align-items:flex-start;
+    gap:clamp(10px,1.2vw,14px);
+    background:var(--elev); border:1px solid var(--hair12); border-radius:20px;
+    padding:clamp(12px,1.8vh,18px) clamp(14px,1.6vw,22px);
+    opacity:0; transform:translateY(12px);
+    transition:opacity .6s var(--eoq), transform .6s var(--eoq); }
+  .s-veredictos .verdict{ opacity:1; transform:none; }
+  .s-veredictos .verdict:nth-child(1){ transition-delay:.05s; }
+  .s-veredictos .verdict:nth-child(2){ transition-delay:.20s; }
+
+  /* Los dos veredictos en peach: ✓ sólido, ✗ de contorno. La distinción la
+     hace la forma (relleno vs contorno), no un cambio de color. */
+  .v-mark{ flex:none; width:clamp(26px,3.4vh,34px); height:clamp(26px,3.4vh,34px);
+    border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .v-mark svg{ width:56%; height:56%; display:block; }
+  .verdict.ok .v-mark{ background:var(--peach); color:var(--mark-ink); }
+  .verdict.gap .v-mark{ border:1.5px solid var(--peach); color:var(--peach); }
+
+  .v-label{ font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(12px,1.6vh,13.5px);
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--w45); }
+  .v-state{ margin-top:2px; font-family:"Red Hat Display",sans-serif; font-weight:700;
+    font-size:clamp(15px,2.2vh,19px); line-height:1.2; color:var(--ink); }
+  .verdict.gap .v-state{ color:var(--peach); }
+  .v-note{ margin-top:5px; font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(13px,1.85vh,16px); line-height:1.42; color:var(--w75); }
+
+  /* ===== Fila 2 — DOS columnas de lectura =====
+     Eran tres (descartes · interesados · insights). Al eliminarse la columna de
+     interesados, las dos que quedan se reparten el ancho completo a 50/50 —
+     `flex:1 1 0` sobre dos hijos ya lo hace — y el texto respira más. */
+  /* flex:0 0 auto → la fila mide lo que mide su contenido y no se estira. */
+  .cols{ flex:0 0 auto; min-height:0; display:flex; gap:clamp(18px,2.4vw,34px);
+    margin-top:clamp(20px,3vh,30px); margin-bottom:auto; }
+  .col{ flex:1 1 0; min-width:0; display:flex; flex-direction:column;
+    opacity:0; transform:translateY(12px);
+    transition:opacity .6s var(--eoq), transform .6s var(--eoq); }
+  .col + .col{ border-left:1px solid var(--hair08); padding-left:clamp(18px,2.4vw,34px); }
+  .s-motivos .col-motivos{ opacity:1; transform:none; }
+  .s-insights .col-insights{ opacity:1; transform:none; }
+
+  .col-title{ flex:0 0 auto;
+    font-family:"Inter",sans-serif; font-weight:500; font-size:clamp(12px,1.7vh,14px);
+    text-transform:uppercase; letter-spacing:1.5px; color:var(--peach);
+    padding-bottom:clamp(9px,1.3vh,13px); margin-bottom:clamp(9px,1.3vh,13px);
+    border-bottom:1px solid var(--hair08); }
+
+  /* Las columnas tienen distinta cantidad de ítems (5/3 en el ejemplo), así que
+     el sobrante se acumulaba abajo como un hueco único. El cuerpo se centra en
+     el alto de su columna: los títulos siguen alineados entre sí y el aire se
+     reparte arriba y abajo en vez de juntarse en un solo bloque muerto. */
+  .col-body{ flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column; justify-content:center; }
+
+  .lista{ list-style:none; display:flex; flex-direction:column; gap:clamp(8px,1.6vh,20px); }
+  .lista li{ position:relative; padding-left:17px;
+    font-family:"Red Hat Display",sans-serif; font-weight:400;
+    font-size:clamp(14.5px,2.1vh,17.5px); line-height:1.4; color:var(--w75); }
+  .lista li::before{ content:"–"; position:absolute; left:0; top:0;
+    color:var(--w45); font-weight:700; }
+  .lista li b{ font-weight:600; color:var(--ink); }
+
+  /* Pantalla de error cuando data/proceso.js no llegó: la ve quien edita los
+     datos, no un cliente, por eso es texto plano y directo. */
+  .data-error{ display:flex; align-items:center; justify-content:center;
+    height:100vh; padding:40px; text-align:center;
+    font-family:"Inter",sans-serif; font-size:18px; line-height:1.5; color:#FD650D; }
+
+  .no-anim *, .no-anim *::before, .no-anim *::after{ transition:none !important; animation:none !important; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+    .kicker,.title,.verdict,.col{ opacity:1 !important; transform:none !important; }
+  }
+</style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="ic-check" viewBox="0 0 16 16">
+      <path d="M13 4.6 6.6 12 3 8.3" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="ic-x" viewBox="0 0 16 16">
+      <path d="M4.4 4.4l7.2 7.2M11.6 4.4l-7.2 7.2" fill="none" stroke="currentColor"
+            stroke-width="2.4" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+
+  <main class="slide" id="slide">
+    <div class="head">
+      <p class="kicker">Contexto del proceso de selección</p>
+      <h1 class="title">Insights de la <span class="accent">búsqueda</span></h1>
+    </div>
+
+    <!-- Paso 1 — los dos veredictos duros contra lo levantado con el cliente.
+         Las dos tarjetas las arma el render; la fila está pensada para 2. -->
+    <div class="verdicts" id="verdicts"></div>
+
+    <div class="cols">
+      <!-- Paso 2 -->
+      <div class="col col-motivos">
+        <p class="col-title">Principales motivos de descarte</p>
+        <div class="col-body">
+          <ul class="lista" id="lista-motivos"></ul>
+        </div>
+      </div>
+
+      <!-- Paso 3 -->
+      <div class="col col-insights">
+        <p class="col-title">Lo que muestra el mercado</p>
+        <div class="col-body">
+          <ul class="lista" id="lista-insights"></ul>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      var P = window.PROCESO;
+
+      /* Sin datos no hay lámina. El mensaje es para quien edita proceso.js
+         (perfil no técnico), por eso dice el archivo y la causa, nada más. */
+      if (!P){
+        document.body.innerHTML =
+          '<div class="data-error">data/proceso.js no cargó o tiene un error de sintaxis</div>';
+        return;
+      }
+
+      var slide = document.getElementById('slide');
+
+      /* ===== RENDER =====
+         Corre ANTES de la coreografía: las clases de paso animan nodos que se
+         crean acá, así que el DOM tiene que estar completo antes de .play. */
+      var meta = P.meta || {};
+      var C    = P.conclusion || {};
+
+      document.title = 'Insights de la búsqueda — Presentación de candidatos · ' + (meta.cargo || '');
+
+      // Sólo los campos con <b> de proceso.js van por innerHTML; el resto, texto.
+      function li(html){
+        var n = document.createElement('li');
+        n.innerHTML = html;
+        return n;
+      }
+      function fill(id, arr, max){
+        var ul = document.getElementById(id);
+        (arr || []).slice(0, max).forEach(function(txt){ ul.appendChild(li(txt)); });
+      }
+
+      // Veredictos: ok:true → ✓ sólido; ok:false → ✗ de contorno (clase .gap).
+      var vWrap = document.getElementById('verdicts');
+      (C.veredictos || []).slice(0, 2).forEach(function(v){
+        var card = document.createElement('div');
+        card.className = 'verdict ' + (v.ok ? 'ok' : 'gap');
+
+        var mark = document.createElement('span');
+        mark.className = 'v-mark';
+        mark.innerHTML = '<svg><use href="#' + (v.ok ? 'ic-check' : 'ic-x') + '"/></svg>';
+
+        var body  = document.createElement('div');
+        var label = document.createElement('p');
+        label.className = 'v-label';
+        label.textContent = v.label || '';
+        var state = document.createElement('p');
+        state.className = 'v-state';
+        state.textContent = v.estado || '';
+        var note = document.createElement('p');
+        note.className = 'v-note';
+        note.innerHTML = v.nota || '';
+
+        body.appendChild(label); body.appendChild(state); body.appendChild(note);
+        card.appendChild(mark); card.appendChild(body);
+        vWrap.appendChild(card);
+      });
+
+      // Columna 1 — máx 5 motivos: más ítems no caben en el alto de la lámina.
+      fill('lista-motivos', C.motivosCaida, 5);
+
+      // Columna 2 — insights del mercado.
+      fill('lista-insights', C.insights);
+
+      /* ===== COREOGRAFÍA ===== */
+      var STEPS = ['s-veredictos','s-motivos','s-insights'];
+      var DUR   = [0, 1000, 1200, 1200];
+
+      var startAtEnd = new URLSearchParams(location.search).get('at') === 'end';
+      var idx = startAtEnd ? STEPS.length : 0;
+      var animating = false, animTimer = null;
+
+      if (startAtEnd){
+        slide.classList.add('no-anim');
+        STEPS.forEach(function(c){ slide.classList.add(c); });
+        slide.classList.add('play');
+        void slide.offsetWidth;
+        slide.classList.remove('no-anim');
+      } else {
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){ slide.classList.add('play'); });
+        });
+      }
+
+      function flush(){
+        clearTimeout(animTimer);
+        animating = false;
+        slide.classList.add('no-anim');
+        void slide.offsetWidth;
+        slide.classList.remove('no-anim');
+      }
+
+      window.deckStep = function(dir){
+        if (dir > 0){
+          if (animating) flush();
+          if (idx >= STEPS.length) return false;
+          slide.classList.add(STEPS[idx]);
+          idx++;
+          animating = true;
+          clearTimeout(animTimer);
+          animTimer = setTimeout(function(){ animating = false; }, DUR[idx] || 1200);
+          return true;
+        }
+        if (dir < 0){
+          if (animating) flush();
+          if (idx <= 0) return false;
+          idx--;
+          slide.classList.add('no-anim');
+          slide.classList.remove(STEPS[idx]);
+          void slide.offsetWidth;
+          slide.classList.remove('no-anim');
+          return true;
+        }
+        return false;
+      };
+
+      // El teclado lo escucha _nav.js (único punto de entrada, ver perfil.html):
+      // un listener propio acá consumiría dos pasos por tecla.
+    })();
+  </script>
+</body>
+</html>
