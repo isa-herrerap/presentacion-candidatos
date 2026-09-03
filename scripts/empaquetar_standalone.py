@@ -92,6 +92,13 @@ def main() -> None:
     for fname in slide_files:
         with open(os.path.join(slides_dir, fname), encoding="utf-8") as f:
             text = f.read()
+        # Una URL data: en base64 no admite '?query' al final (se mezclaría con
+        # los datos y rompería la decodificación) — el único trozo que el
+        # navegador separa ANTES de decodificar es el fragmento '#'. Por eso el
+        # shell empaqueta tema/candidato/paso ahí, y cada lámina tiene que leerlos
+        # de location.hash en vez de location.search para que le lleguen igual.
+        exigir(text, "location.search", fname)
+        text = text.replace("location.search", "location.hash.slice(1)")
         exigir(text, '<script src="_nav.js"></script>', fname)
         text = text.replace('<script src="_nav.js"></script>', "<script>\n" + nav_js + "\n</script>")
         exigir(text, '<script src="../data/proceso.js"></script>', fname)
@@ -118,8 +125,8 @@ def main() -> None:
     ) + "\n};\nfunction slideSrc(file){ return 'data:text/html;base64,' + SLIDE_B64[file]; }\n"
     shell = shell.replace("const BUILD = ", mapa + "const BUILD = ", 1)
 
-    shell = shell.replace(marca_cargar, "cargar(slideSrc(s.file)+'?b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+(atEnd ? '&at=end' : ''));")
-    shell = shell.replace(marca_cv, "cvFrame.src = slideSrc('cv.html')+'?b='+BUILD+'&theme='+theme+'&'+s.cv;")
+    shell = shell.replace(marca_cargar, "cargar(slideSrc(s.file)+'#b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+(atEnd ? '&at=end' : ''));")
+    shell = shell.replace(marca_cv, "cvFrame.src = slideSrc('cv.html')+'#b='+BUILD+'&theme='+theme+'&'+s.cv;")
 
     slug = os.path.basename(deck_dir.rstrip("/"))
     out_path = os.path.join(deck_dir, f"{slug}-standalone.html")
