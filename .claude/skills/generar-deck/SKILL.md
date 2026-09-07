@@ -31,16 +31,20 @@ deck de la plantilla maestra.
 
 La carpeta de un caso trae: un **perfil o descriptor de cargo** (normalmente .docx, pero a
 veces llega en **.pdf**), un **screening** (.xlsx) y los **CV** (.pdf) de los
-candidatos que avanzan. Extrae docx y xlsx a texto:
+candidatos que avanzan. Opcionalmente puede traer también un **docx de
+universo** (cualquier nombre que contenga la palabra "universo") y **fotos de
+candidatos** (.png/.jpg) — ver más abajo cómo se usa cada uno. Extrae docx y
+xlsx a texto:
 
 ```bash
 python3 scripts/extraer_caso.py casos/<n>
 ```
 
 (Acepta también rutas absolutas para script y carpeta — no necesitas `cd`.)
-Deja `casos/<n>/_extraccion/{perfil.txt, screening.txt}`. Si faltan las
-dependencias, el propio script imprime cómo crear el venv (una sola vez).
-Los CV los lees directo con el Read tool (soporta PDF).
+Deja `casos/<n>/_extraccion/{perfil.txt, screening.txt}` y, si había un docx
+de universo, también `universo.txt`. Si faltan las dependencias, el propio
+script imprime cómo crear el venv (una sola vez). Los CV los lees directo con
+el Read tool (soporta PDF).
 
 **Si el perfil de cargo vino en PDF**: el script no lo convierte (sólo
 procesa .docx) y te avisa al correr. En ese caso no hay `perfil.txt` —
@@ -58,8 +62,8 @@ contrato, con el porqué de cada campo en los comentarios: úsalo como referenci
 de forma y tono.
 
 Luego lee el perfil (`perfil.txt`, o el PDF directo si vino en ese formato),
-`screening.txt` y TODOS los CV. Claves de lectura del
-screening (verificadas en casos reales):
+`screening.txt`, `universo.txt` (si existe) y TODOS los CV. Claves de lectura
+del screening (verificadas en casos reales):
 
 - La fila de encabezados define columnas fijas (Nombre, Edad, Comuna,
   Título - Institución, Trab., Cargo, Empresa, Pretensión de Renta, Avanza a
@@ -159,6 +163,32 @@ honesta (ver el punto 1 de "Preguntas que SIEMPRE se hacen" en el paso 4).
 
 ### 4 · Armar el borrador de `proceso.js` y levantar los gaps
 
+**Primero se lee TODO, después se pregunta TODO junto, y recién ahí se escribe.**
+El objetivo es que la consultora conteste todo en una sola sentada y pueda
+desligarse mientras tú escribes, generas y verificas sin más interrupciones —
+nunca preguntar de a poco a medida que te van surgiendo dudas mientras lees o
+redactas:
+
+1. Termina de leer perfil, screening y los 6 CV (paso 2) antes de escribir
+   nada de `proceso.js` y antes de disparar la primera pregunta.
+2. Con todo leído, arma en tu cabeza (o en un scratch, no en el archivo
+   todavía) cada propuesta que vas a necesitar confirmar: requisitos del
+   cargo, criterios de la comparativa y su formato, motivos de caída,
+   insights, veredicto de renta, tesis de cada candidato. No hace falta
+   escribirlas ya en `proceso.js` — sólo tenerlas listas para ofrecerlas como
+   opciones concretas en la pregunta (grupo B pide justo eso).
+3. Dispara TODAS las preguntas de los grupos A y B (y C si no te pidieron
+   correr sin preguntas) SEGUIDAS, en el menor número de llamadas a
+   `AskUserQuestion` posible, una detrás de otra en el mismo turno — nunca
+   una pregunta, esperar la respuesta, seguir leyendo o redactando, y
+   preguntar otra cosa después. Si un grupo tiene más de 4 preguntas (el
+   máximo por llamada), manda varias llamadas seguidas igual, no vayas
+   soltándolas de a una a medida que las notas.
+4. Sólo cuando tengas TODAS las respuestas, recién ahí escribe `proceso.js`
+   completo y sigue con los pasos 5-7 sin volver a interrumpir a la
+   consultora, salvo algo que de verdad no puedas resolver solo (un dato
+   contradictorio entre documentos, por ejemplo).
+
 Construye el objeto completo siguiendo SCHEMA.md. Redacta en español profesional
 neutro — el deck lo lee el **cliente**; los juicios internos del consultor ("me
 encanta", "no me mató") se reescriben, nunca se copian.
@@ -182,6 +212,21 @@ Campos donde se falla seguido al poblar un candidato:
   dibuja igual el círculo con las iniciales — estado válido y presentable, no un
   hueco. **No la saques del CV**: sólo se puebla con una imagen que la consultora
   entregue para el deck.
+
+  **Si hay archivos .png/.jpg/.jpeg en `casos/<n>/`** (`extraer_caso.py` avisa
+  cuántos hay), úsalos SOLO si el nombre del archivo, sin extensión y sin
+  distinguir mayúsculas, calza EXACTO con el `pila` de un candidato — p. ej.
+  `luis.png` para quien tiene `pila: "Luis"`. Ese calce por nombre es la única
+  señal válida: **nunca asignes una foto a un candidato por apariencia**
+  ("parece que es él", mismo género) — una foto mal asignada es un error de
+  identidad frente al cliente, no un detalle estético. Si el nombre del
+  archivo no calza limpio con ningún `pila` (capturas sin renombrar tipo
+  "Captura de pantalla...", nombres genéricos como "foto1.png", o dos
+  candidatos con el mismo `pila`), pregúntale a la consultora cuál va con
+  cuál — no lo adivines ni lo dejes sin foto por asumir. Con el calce limpio,
+  copia el archivo a `decks/<slug>/assets/fotos/<pila-en-minúscula>.<ext>`
+  (junto con el resto de la copia del paso 5) y pon esa ruta relativa en
+  `foto`.
 - **`perfil.evidencia`**: un `lead` y dos listas de texto plano, `funciones` y
   `logros`; las etiquetas las pone la plantilla (ya no hay ejes libres por
   proceso). Lo que hace en el día a día va en `funciones`; lo que construyó o
@@ -250,8 +295,9 @@ Campos donde se falla seguido al poblar un candidato:
   pregunta siempre (ver punto 2 más abajo). `rentaPretension` no entra en esa
   pregunta: esa va siempre.
 
-Mientras armas, anota todo lo que el documento NO trae. Hay tres grupos de
-preguntas, según cuánto se puede automatizar la respuesta.
+Mientras LEES (no mientras escribes el archivo), anota todo lo que el
+documento NO trae — es lo que alimenta las preguntas del punto anterior. Hay
+tres grupos de preguntas, según cuánto se puede automatizar la respuesta.
 
 **Mecánica de la pregunta: TODO pasa por `AskUserQuestion`**, sin excepción —
 nunca un párrafo o una lista donde la consultora tenga que leer todo y
@@ -292,8 +338,30 @@ piloto automático, estas tres no tienen modo silencioso:
 
 1. **Universo de candidatos** (`contexto`) — el screening casi nunca es el
    universo completo (ver el detalle en el paso 3): nunca cuentes sus filas y
-   las presentes como si lo fueran. Pregunta las cuatro cosas, en este orden,
-   porque cada una alimenta un gráfico distinto:
+   las presentes como si lo fueran.
+
+   **Si existe `casos/<n>/_extraccion/universo.txt`** (la consultora dejó un
+   docx de universo en la carpeta — ver paso 1), estos cuatro datos salen de
+   ahí directo, **sin preguntar nada de este punto**: léelo y listo. El
+   formato esperado es simple, etiqueta y valor, tolerante a variaciones de
+   redacción (es texto para que lo leas tú, no para parsear con regex):
+
+   ```
+   Total de candidatos: 390
+   Hunting: 110
+   Postulación: 280
+
+   Hunting por años de experiencia: De 3 a 5 años: 62, De 6 a 10 años: 44, Más de 10 años: 4
+   Hunting por cargo actual: Analista de Contabilidad: 40, Analista Senior: 18, Auditores: 12
+   Hunting por empresa actual: Deloitte: 13, PwC: 13, Otros: 84
+   ```
+
+   Si el archivo existe pero le falta alguno de los cuatro datos (por ejemplo
+   trae el total y el reparto hunting/postulación pero no los tres repartos
+   de LinkedIn), pregunta **sólo lo que falta** — no repreguntes lo que ya
+   viene escrito. Si el archivo no existe, sigue el flujo de siempre: pregunta
+   las cuatro cosas, en este orden, porque cada una alimenta un gráfico
+   distinto:
 
    a. **Cuántos candidatos hubo en total** en el proceso (el número grande de
       la lámina 2).
@@ -424,7 +492,11 @@ decidas tú solo cuáles quedan — tu trabajo acá es proponer, no elegir.
    del screening y pide confirmación.
 10. Si el perfil trae instrucciones internas de renta ("mostrar hasta $X"),
     **qué cifra es presentable** al cliente.
-11. Si hay **fotos** autorizadas para el deck (default: no, va el placeholder).
+11. **Fotos**: si hay .png/.jpg en `casos/<n>/` con nombre calzando limpio
+    con un `pila` (ver el campo `foto` más arriba), úsalas directo — dejarlas
+    ahí con ese nombre YA es la autorización, no hace falta preguntar. Si no
+    hay ninguna, el placeholder de iniciales es el default y tampoco hay nada
+    que preguntar.
 
 **Los próximos pasos NO se preguntan ni se escriben**: la lámina de cierre trae
 el flujo estándar de Mandomedio (entrevista con el consultor → evaluación

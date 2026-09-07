@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
-"""Extrae a texto plano los documentos de un caso: el perfil de cargo (.docx)
-y la planilla de screening (.xlsx).
+"""Extrae a texto plano los documentos de un caso: el perfil de cargo (.docx),
+la planilla de screening (.xlsx) y, si la consultora lo dejó, el docx de
+universo del proceso.
 
 Uso:
     python3 scripts/extraer_caso.py <carpeta-del-caso>
 
 Deja los resultados en <carpeta-del-caso>/_extraccion/:
-    perfil.txt     — párrafos + tablas del docx ("campo | valor")
+    perfil.txt     — párrafos + tablas del docx del perfil ("campo | valor")
     screening.txt  — todas las hojas del xlsx ("col1 | col2 | ..."), incluyendo
                      comentarios de celda si los hay
+    universo.txt   — SOLO si hay un .docx cuyo nombre de archivo contiene
+                     "universo" (sin distinguir mayúsculas) — el total de
+                     candidatos, el reparto hunting/postulación y los tres
+                     repartos de LinkedIn del grupo hunting, que ningún otro
+                     documento trae. Si existe, la skill generar-deck lee estos
+                     datos de acá en vez de preguntarlos.
 
 Los CV en PDF no se extraen acá: Claude los lee directo con su Read tool. El
 perfil de cargo a veces también llega en PDF en vez de .docx — ese caso
 tampoco se extrae acá (este script sólo sabe leer .docx): se lee igual que un
 CV, directo con el Read tool. El script avisa cuando no encuentra ningún
-.docx, para que no se te pase por alto.
+.docx de perfil, para que no se te pase por alto.
 
 Dependencias: openpyxl y python-docx. Si no están instaladas, el script
 intenta usar el venv del proyecto (.venv/) y, si tampoco existe, imprime
@@ -87,30 +94,42 @@ def main() -> None:
     if not os.path.isdir(caso):
         sys.exit(f"No existe la carpeta: {caso}")
 
-    docx = [f for f in glob.glob(os.path.join(caso, "*.docx")) if not os.path.basename(f).startswith("~$")]
+    docx_todos = [f for f in glob.glob(os.path.join(caso, "*.docx")) if not os.path.basename(f).startswith("~$")]
+    # El docx de universo se distingue por nombre de archivo (contiene
+    # "universo", sin distinguir mayúsculas) — así puede convivir con el docx
+    # del perfil sin que uno pise al otro.
+    docx_universo = [f for f in docx_todos if "universo" in os.path.basename(f).lower()]
+    docx_perfil = [f for f in docx_todos if f not in docx_universo]
     xlsx = [f for f in glob.glob(os.path.join(caso, "*.xlsx")) if not os.path.basename(f).startswith("~$")]
     pdfs = glob.glob(os.path.join(caso, "*.pdf"))
-    if not docx and not xlsx:
+    fotos = [f for f in glob.glob(os.path.join(caso, "*.png")) + glob.glob(os.path.join(caso, "*.jpg"))
+             + glob.glob(os.path.join(caso, "*.jpeg"))]
+    if not docx_perfil and not xlsx:
         sys.exit(f"La carpeta no tiene ni .docx (perfil) ni .xlsx (screening): {caso}")
 
     out = os.path.join(caso, "_extraccion")
     os.makedirs(out, exist_ok=True)
 
-    for f in docx:
+    for f in docx_perfil:
         dump_docx(f, os.path.join(out, "perfil.txt"))
         print(f"perfil.txt     <- {os.path.basename(f)}")
+    for f in docx_universo:
+        dump_docx(f, os.path.join(out, "universo.txt"))
+        print(f"universo.txt   <- {os.path.basename(f)}")
     for f in xlsx:
         dump_xlsx(f, os.path.join(out, "screening.txt"))
         print(f"screening.txt  <- {os.path.basename(f)}")
-    if len(docx) > 1 or len(xlsx) > 1:
-        print("OJO: hay más de un docx/xlsx; se extrajo el último de cada tipo. Revisa cuál corresponde.")
-    if not docx:
+    if len(docx_perfil) > 1 or len(docx_universo) > 1 or len(xlsx) > 1:
+        print("OJO: hay más de un docx de perfil, de universo o de xlsx; se extrajo el último de cada tipo. Revisa cuál corresponde.")
+    if not docx_perfil:
         print(
             "OJO: no hay .docx de perfil en esta carpeta. Si el perfil de cargo vino en "
             "PDF, es uno de los PDF de abajo (no un CV) — identifícalo y léelo directo "
             "con el Read tool, igual que un CV; este script no lo convierte."
         )
     print(f"{len(pdfs)} PDF en la carpeta (léelos directo con el Read tool: los CV, y el perfil si vino en ese formato)")
+    if fotos:
+        print(f"{len(fotos)} foto(s) de candidatos en la carpeta (png/jpg) — ver SKILL.md de generar-deck sobre cómo usarlas.")
     print(f"listo → {out}")
 
 

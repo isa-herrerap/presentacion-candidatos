@@ -311,13 +311,32 @@
      (o con escalado de Windows) el contenido no entra, cae solo a alinearse
      arriba en vez de desbordarse simétrico hacia los dos lados — así el
      principio del bloque (el kicker, "Motivación por el cargo") nunca queda
-     tapado. El `overflow-y:auto` es lo que deja ver el resto (las salidas que
-     no entraron) con scroll en vez de recortarlas en silencio contra el
+     tapado. El scroll (ver más abajo) es lo que deja ver el resto (las
+     salidas que no entraron) en vez de recortarlas en silencio contra el
      `overflow:hidden` de `.card`. Sin scroll necesario, no se dibuja barra:
      esto es puro fallback, no un rediseño del caso común. */
   .cbody{ height:100%; display:flex; flex-direction:column; justify-content:safe center;
-    overflow-y:auto; overflow-x:hidden;
+    overflow:hidden;
     transition:opacity .5s var(--ease); }
+  /* El scroll NO puede quedar activo de entrada en `.cbody`: el contenido
+     (p.ej. las salidas) ya está en el DOM completo desde el primer render,
+     mucho antes de que le toque su paso — sólo lo tapa la transparencia de
+     fondo/borde/sombra de `.card` (ver arriba), no `opacity` ni `display`. Un
+     scrollbar es una capa del navegador aparte que no respeta esa
+     transparencia: si `overflow-y` estuviera en `auto` de entrada, la barra
+     se dibuja igual, flotando sobre el fondo vacío, desde el paso `hero` — se
+     ve como una rayita suelta que "aparece pegada" al cambiar de candidato,
+     aunque cada candidato es una lámina nueva sin nada compartido. Por eso el
+     scroll se activa recién junto con el mismo selector que pinta la card —
+     y ojo, `overflow-x` va SIEMPRE explícito junto con `overflow-y` en la
+     misma regla: dejar sólo `overflow-y:auto` sin fijar `overflow-x` hace que
+     el navegador calcule `overflow-x` como `auto` también (la spec de CSS
+     Overflow acopla los dos ejes cuando uno de los dos no es `visible`), y
+     ahí vuelve el mismo bug por la puerta de atrás. */
+  .s-evid .evid-card .cbody,
+  .s-check .check-band .cbody,
+  .s-moveria .moveria .cbody,
+  .s-economia .economia .cbody{ overflow-y:auto; overflow-x:hidden; }
   .cbody::-webkit-scrollbar{ width:6px; }
   .cbody::-webkit-scrollbar-track{ background:transparent; }
   .cbody::-webkit-scrollbar-thumb{ background:var(--hair12); border-radius:3px; }
