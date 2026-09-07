@@ -23,12 +23,30 @@ assets/*.svg, y escribe el archivo nuevo al lado. No toca nada de la carpeta
 del deck ni de deck-template/.
 """
 import base64
+import io
 import mimetypes
 import os
 import re
 import sys
 
-FOTO_RE = re.compile(r"""(foto\s*:\s*)(['"])((?:(?!\2).)*)\2""")
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+FOTO_RE = re.compile(r"""(["']?foto["']?\s*:\s*)(['"])((?:(?!\2).)*)\2""")
+
+# `foto` se pinta SÓLO en perfil.html, dentro de un círculo de ~124px máximo
+# (ver deck-template/slides/perfil.html, `.foto{width:clamp(76px,12vh,124px)}`).
+# Las fotos que entrega la consultora suelen ser capturas de LinkedIn de
+# 1000-1500px por lado y 1-1.5 MB cada una — de ahí sale casi todo el peso de
+# un standalone con fotos (con 6 candidatos, ~9 MB en base64 sólo de fotos).
+# Se reescalan a esto antes de incrustarlas: de sobra para verse nítidas
+# incluso en una pantalla retina, y del orden de 15-40 KB cada una en vez de
+# 1+ MB. `_MAX_LADO` es el lado más largo tras el resize (no fuerza cuadrado:
+# el CSS ya recorta con `object-fit:cover` + `border-radius:50%`).
+_MAX_LADO_FOTO = 420
+_CALIDAD_JPEG = 82
 
 
 def b64_file(path: str) -> str:
@@ -39,6 +57,39 @@ def b64_file(path: str) -> str:
 def data_uri(path: str) -> str:
     mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
     return f"data:{mime};base64,{b64_file(path)}"
+
+
+def foto_data_uri(path: str) -> str:
+    """Como data_uri(), pero para fotos de candidatos: reescala y recomprime
+    a JPEG antes de incrustar. Si Pillow no está instalado, cae a incrustar
+    el archivo tal cual (mismo comportamiento de antes) con un aviso."""
+    if Image is None:
+        print("  OJO: Pillow no está instalado — la foto se incrusta sin comprimir "
+              "(pip install Pillow para bajar el peso del standalone).")
+        return data_uri(path)
+    try:
+        img = Image.open(path)
+        # `convert('RGB')` directo sobre RGBA no aplana el alfa, lo descarta
+        # (deja basura donde había transparencia) — si el modo trae canal
+        # alfa, aplanar explícito sobre blanco primero. Cualquier resto fuera
+        # del área opaca de todos modos queda recortado por el círculo CSS.
+        if img.mode in ("RGBA", "LA", "P"):
+            src = img.convert("RGBA")
+            base = Image.new("RGB", src.size, (255, 255, 255))
+            base.paste(src, mask=src.split()[-1])
+            img = base
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+        lado = max(img.size)
+        if lado > _MAX_LADO_FOTO:
+            factor = _MAX_LADO_FOTO / lado
+            img = img.resize((round(img.width * factor), round(img.height * factor)), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=_CALIDAD_JPEG, optimize=True)
+        return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception as e:
+        print(f"  OJO: no se pudo recomprimir {path} ({e}) — se incrusta tal cual.")
+        return data_uri(path)
 
 
 def js_str(s: str) -> str:
@@ -54,8 +105,10 @@ def inline_fotos(proceso_js: str, deck_dir: str) -> str:
         if not os.path.isfile(abs_path):
             print(f"  OJO: foto no encontrada, se deja la ruta tal cual: {ruta}")
             return m.group(0)
-        print(f"  foto incrustada: {ruta}")
-        return f"{prefijo}{quote}{data_uri(abs_path)}{quote}"
+        uri = foto_data_uri(abs_path)
+        peso_kb = round(len(uri) * 3 / 4 / 1024)  # aprox., base64 -> bytes reales
+        print(f"  foto incrustada: {ruta} (~{peso_kb} KB)")
+        return f"{prefijo}{quote}{uri}{quote}"
 
     return FOTO_RE.sub(repl, proceso_js)
 
@@ -76,8 +129,16 @@ def main() -> None:
         sys.exit(f"No hay deck.html en: {deck_dir}")
 
     with open(os.path.join(deck_dir, "data", "proceso.js"), encoding="utf-8") as f:
-        proceso_js = f.read()
-    proceso_js = inline_fotos(proceso_js, deck_dir)
+        proceso_js_liviano = f.read()
+    # proceso.js se incrusta en CADA lámina (cada una es un documento aparte,
+    # sin acceso al window.PROCESO del shell) — con fotos ya incrustadas en
+    # base64, ese archivo puede pesar varios MB, y duplicarlo en las 9+
+    # láminas dispararía el standalone a cientos de MB. Como sólo perfil.html
+    # pinta `candidato.foto`, se arma una variante CON fotos sólo para esa
+    # lámina; el resto (y el propio shell, que tampoco pinta fotos) usan la
+    # versión liviana con las rutas relativas tal cual — así "Descargar datos
+    # actualizados" también sigue bajando rutas normales, no un blob gigante.
+    proceso_js_fotos = inline_fotos(proceso_js_liviano, deck_dir)
 
     with open(os.path.join(deck_dir, "slides", "_nav.js"), encoding="utf-8") as f:
         nav_js = f.read()
@@ -117,9 +178,20 @@ def main() -> None:
             editable_js_hash = editable_js.replace("location.search", "location.hash.slice(1)")
             text = text.replace('<script src="_editable.js"></script>', "<script>\n" + editable_js_hash + "\n</script>")
         exigir(text, '<script src="../data/proceso.js"></script>', fname)
-        text = text.replace('<script src="../data/proceso.js"></script>', "<script>\n" + proceso_js + "\n</script>")
+        proceso_js_para_lamina = proceso_js_fotos if fname == "perfil.html" else proceso_js_liviano
+        text = text.replace('<script src="../data/proceso.js"></script>', "<script>\n" + proceso_js_para_lamina + "\n</script>")
         text = text.replace('src="../assets/logo-horizontal-positivo.svg"', f'src="{logo_pos}"')
         text = text.replace('src="../assets/logo-horizontal-negativo.svg"', f'src="{logo_neg}"')
+        # El shell manda el tema por postMessage en vez de recargar (ver más
+        # abajo, junto a applyTheme): cada lámina necesita escucharlo.
+        exigir(text, "</body>", fname)
+        text = text.replace(
+            "</body>",
+            "<script>window.addEventListener('message', function(e){"
+            " if(e && e.data && e.data.deck === 'theme'){"
+            " document.documentElement.dataset.theme = e.data.theme; } });</script>\n</body>",
+            1,
+        )
         slide_b64[fname] = base64.b64encode(text.encode("utf-8")).decode("ascii")
 
     with open(os.path.join(deck_dir, "deck.html"), encoding="utf-8") as f:
@@ -131,7 +203,7 @@ def main() -> None:
                  'src="assets/logo-horizontal-negativo.svg"', marca_cargar, marca_cv, "const BUILD = "):
         exigir(shell, frag, "deck.html")
 
-    shell = shell.replace('<script src="data/proceso.js"></script>', "<script>\n" + proceso_js + "\n</script>")
+    shell = shell.replace('<script src="data/proceso.js"></script>', "<script>\n" + proceso_js_liviano + "\n</script>")
     # Igual que en las láminas: _editable.js es opcional (decks generados
     # antes de esta feature no traen esa etiqueta en deck.html).
     if editable_js is not None and '<script src="slides/_editable.js"></script>' in shell:
@@ -139,13 +211,54 @@ def main() -> None:
     shell = shell.replace('src="assets/logo-horizontal-positivo.svg"', f'src="{logo_pos}"')
     shell = shell.replace('src="assets/logo-horizontal-negativo.svg"', f'src="{logo_neg}"')
 
+    # slideSrc() NO puede devolver la misma URL 'data:' dos veces para el mismo
+    # archivo (p.ej. perfil.html para cada candidato, que sólo cambia el
+    # '#hash'): un cambio SÓLO en el fragmento de una URL 'data:' ya vista es,
+    # para Chrome, una navegación de ancla dentro del MISMO documento, no una
+    # recarga — por eso el deck quedaba pegado en el primer candidato. La
+    # solución: decodificar el HTML ya empaquetado y crear un blob: URL NUEVO
+    # en cada llamada. Un blob: URL es único incluso para contenido idéntico,
+    # así que cada 'cargar()' es SIEMPRE una navegación real, sin tocar el
+    # mecanismo de '#hash' que ya usan las láminas para leer sus parámetros.
     mapa = "const SLIDE_B64 = {\n" + ",\n".join(
         f"  {js_str(fname)}: {js_str(slide_b64[fname])}" for fname in slide_files
-    ) + "\n};\nfunction slideSrc(file){ return 'data:text/html;base64,' + SLIDE_B64[file]; }\n"
+    ) + (
+        "\n};\n"
+        "function slideSrc(file){\n"
+        "  var bin = atob(SLIDE_B64[file]);\n"
+        "  var bytes = new Uint8Array(bin.length);\n"
+        "  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);\n"
+        "  return URL.createObjectURL(new Blob([bytes], {type: 'text/html'}));\n"
+        "}\n"
+    )
     shell = shell.replace("const BUILD = ", mapa + "const BUILD = ", 1)
 
     shell = shell.replace(marca_cargar, "cargar(slideSrc(s.file)+'#b='+BUILD+'&theme='+theme+(s.params ? '&'+s.params : '')+'&edit='+(editMode?1:0)+editsQS+((atEnd||editMode) ? '&at=end' : ''));")
     shell = shell.replace(marca_cv, "cvFrame.src = slideSrc('cv.html')+'#b='+BUILD+'&theme='+theme+'&'+s.cv;")
+
+    # El cambio de tema NO puede seguir recargando el iframe. Antes vivía en la
+    # URL (?theme=...) y cambiarla obligaba a recargar — con URLs data: eso ya
+    # no sirve: cambiar SÓLO el fragmento (#theme=...) es, para el navegador,
+    # un salto de ancla dentro del MISMO documento, no una recarga (aparece
+    # igual en frame.src, pero el documento real nunca se vuelve a pintar).
+    # Probamos forzar la recarga con el truco 'about:blank' + rAF/setTimeout:
+    # falla de forma intermitente incluso en el caso más simple (~50% de las
+    # veces en pruebas repetidas con Playwright) — Chrome no garantiza que una
+    # navegación a data: iniciada así (sin gesto del usuario "fresco") se
+    # complete. No es un problema de temporización que se arregle con más
+    # espera. La solución robusta es no depender de recargar el documento: se
+    # le manda el tema por postMessage a la lámina ya cargada (la misma vía que
+    # usa el resto del puente en _nav.js) y ella lo aplica en el momento, sin
+    # navegar a ningún lado.
+    theme_apply_orig = (
+        "  if(cvAbierta){ cargarCV(); cargarSlide(true); }\n"
+        "  else go(i);"
+    )
+    exigir(shell, theme_apply_orig, "deck.html")
+    shell = shell.replace(theme_apply_orig, (
+        "  try{ frame.contentWindow.postMessage({deck:'theme', theme:theme}, '*'); }catch(err){}\n"
+        "  if(cvAbierta){ try{ cvFrame.contentWindow.postMessage({deck:'theme', theme:theme}, '*'); }catch(err){} }"
+    ))
 
     slug = os.path.basename(deck_dir.rstrip("/"))
     out_path = os.path.join(deck_dir, f"{slug}-standalone.html")

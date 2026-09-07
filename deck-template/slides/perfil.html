@@ -306,8 +306,22 @@
     transform:translateY(10px); min-height:0; overflow:hidden;
     transition:background-color .7s ease-in-out, border-color .7s ease-in-out,
                box-shadow .7s ease-in-out, transform .7s var(--ease); }
-  .cbody{ height:100%; display:flex; flex-direction:column; justify-content:center;
+  /* `safe center`: centra el contenido igual que antes cuando entra completo
+     (cero cambio visual en el caso normal), pero si en una pantalla más chica
+     (o con escalado de Windows) el contenido no entra, cae solo a alinearse
+     arriba en vez de desbordarse simétrico hacia los dos lados — así el
+     principio del bloque (el kicker, "Motivación por el cargo") nunca queda
+     tapado. El `overflow-y:auto` es lo que deja ver el resto (las salidas que
+     no entraron) con scroll en vez de recortarlas en silencio contra el
+     `overflow:hidden` de `.card`. Sin scroll necesario, no se dibuja barra:
+     esto es puro fallback, no un rediseño del caso común. */
+  .cbody{ height:100%; display:flex; flex-direction:column; justify-content:safe center;
+    overflow-y:auto; overflow-x:hidden;
     transition:opacity .5s var(--ease); }
+  .cbody::-webkit-scrollbar{ width:6px; }
+  .cbody::-webkit-scrollbar-track{ background:transparent; }
+  .cbody::-webkit-scrollbar-thumb{ background:var(--hair12); border-radius:3px; }
+  .cbody:hover::-webkit-scrollbar-thumb{ background:var(--w45); }
 
   /* Reparto de las tres filas. Al subir el piso tipográfico la banda de
      requisitos quedó al borde: con las pills en 13 px caben en una fila,

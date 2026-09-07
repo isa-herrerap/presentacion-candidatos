@@ -49,7 +49,8 @@ presentacion-candidatos/
 │                             archivos que cambiaron (deck.html, slides/*) —
 │                             SIN tocar su data/proceso.js.
 ├── scripts/extraer_caso.py ← docx/xlsx → texto plano
-└── .claude/                ← skill generar-deck, agente verificador-deck, hook
+└── .claude/                ← skills generar-deck y actualizar-deck, agente
+                              verificador-deck, hook
 ```
 
 ## Reglas
