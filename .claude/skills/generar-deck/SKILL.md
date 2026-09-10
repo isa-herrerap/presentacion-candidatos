@@ -234,13 +234,38 @@ Campos donde se falla seguido al poblar un candidato:
   **Fuente: primero el screening, el CV sólo para completar.** La columna
   Observaciones y los juicios del consultor son la base — ahí está lo que la
   consultora ya evaluó como relevante. Recurre al CV sólo si el screening
-  viene pobre en un candidato o falta un dato puntual que el CV sí trae. Esto
-  no es sólo orden de prioridad: el CV el cliente lo puede llegar a ver
-  aparte (queda colgado en la modal del perfil), así que copiarlo tal cual
-  duplica contenido y arrastra su tono técnico interno a la lámina. Sea cual
-  sea la fuente, **reescribe en lenguaje llano** — nada de jerga interna o
-  siglas de industria sin explicar: el que lee esto es el cliente, no otro
-  reclutador.
+  viene pobre en un candidato o falta un dato puntual que el CV sí trae, y al
+  completar mantén el mismo tono llano del screening — no dejes que el CV
+  suba el nivel técnico del texto. Esto no es sólo orden de prioridad: el CV
+  el cliente lo puede llegar a ver aparte (queda colgado en la modal del
+  perfil), así que copiarlo tal cual duplica contenido y arrastra su tono
+  técnico interno a la lámina.
+
+  **Quién lee esto**: alguien de RR.HH. del cliente y quien va a ser el jefe
+  directo del candidato — no necesariamente expertos en la especialidad
+  técnica del cargo. Y ojo, esto no es sólo "simplificar para el cliente":
+  nosotros como consultores tampoco dominamos en profundidad lo técnico de
+  muchos cargos, así que no podemos presentar y explicar bien algo que ni
+  nosotros entendemos del todo. Si al escribirlo te cuesta entender qué
+  significa el término, es señal de que tampoco lo va a entender quien lee el
+  deck: no lo copies igual, tradúcelo a **qué logró o qué problema resolvió**,
+  no a cómo lo hizo técnicamente. Sea cual sea la fuente, **reescribe en
+  lenguaje llano** — nada de jerga interna, siglas de industria sin explicar,
+  ni nombres de tecnologías o protocolos específicos salvo que sean tan
+  conocidos que no necesiten explicación (Excel, SAP sí; "Step Functions",
+  "OSPF", "BGP" no).
+
+  Dos ejemplos del mismo criterio, en cargos técnicos distintos:
+  - **Product builder** — ❌ "Diseñó un pipeline de ETL serverless con
+    triggers basados en eventos S3, orquestado vía Step Functions." →
+    ✅ "Construyó un sistema automático que ordena y limpia los datos de los
+    nuevos usuarios apenas entran, permitiendo evaluarlos al instante sin
+    trabajo manual."
+  - **Ingeniero de procesos de redes** — ❌ "Implementó segmentación con
+    VLANs 802.1Q entre switches core, configurando BGP con route reflectors
+    para optimizar convergencia OSPF." → ✅ "Rediseñó la red de la empresa
+    para que fuera más segura y no se cayera si algo fallaba, dejando un
+    respaldo automático ante problemas."
 - **`perfil.salidas[].duracion` va SIEMPRE, en todas las salidas.** Se
   **deriva** cruzando la salida con la entrada equivalente de `cv.trayectoria`
   del mismo candidato, con el redondeo que documenta `proceso.js`. Si el CV
@@ -426,7 +451,14 @@ piloto automático, estas tres no tienen modo silencioso:
    (edad, comuna, formación…).
 2. **¿Se muestra la renta líquida actual de los candidatos, o solo la
    pretensión?** La pretensión **siempre** se presenta — eso no se pregunta.
-   Lo que se pregunta es si además va la renta actual.
+   Lo que se pregunta es si además va la renta actual. **Sin excepción: aunque
+   el resto del proceso corra en piloto automático, esta pregunta se manda por
+   `AskUserQuestion` sí o sí — nunca se infiere de si el dato está o no en el
+   screening.** Deja la respuesta trazable con un comentario al tope de
+   `proceso.js`, por ejemplo `// Renta actual: SÍ se muestra (decisión de la
+   consultora)` o `// Renta actual: NO se muestra (decisión de la
+   consultora)` — así el paso 6 (verificador-deck) puede confirmar que se
+   preguntó en vez de asumirlo.
 3. **Veredicto de renta** de la lámina de insights: pregúntale a la consultora cómo
    estaba el mercado en general para este cargo y propónle una respuesta con
    la evidencia que tengas, pero que sea ella quien la confirme o la ajuste.
@@ -591,6 +623,10 @@ se clickean hasta 3 candidatos para verlos lado a lado (`Esc` limpia).
 - **No inventar**: dato que no está → se omite o se pregunta. Vale para un campo
   de un candidato y, sobre todo, para las filas del contexto. (El único deck con
   datos inventados es el mockup Ñuble de la plantilla.)
+- **Renta actual: nunca se asume, siempre se pregunta.** Que el dato esté en el
+  screening no autoriza a mostrarlo — es decisión de la consultora, se pregunta
+  por `AskUserQuestion` en todos los casos (ver punto 2 del paso 4) y queda
+  trazada con un comentario en `proceso.js`.
 - Respeta los **límites por lámina** de SCHEMA.md: están calibrados al layout.
 - Un deck por proceso en `decks/`; si se regenera, sobreescribe la misma
   carpeta (no acumules `-v2`).

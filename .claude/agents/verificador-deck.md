@@ -40,6 +40,20 @@ Revisa, en este orden:
    que se copió del CV en vez de priorizar el screening: lenguaje técnico o
    siglas de industria sin explicar, frases que calzan casi literal con una
    línea del CV cuando el screening ya traía ese dato con otras palabras.
+7. **Jerga técnica sin traducir en `evidencia.funciones`/`.logros`**: el
+   lector es RR.HH. del cliente y el futuro jefe directo, no un experto en la
+   especialidad técnica del cargo — ni la consultora lo es siempre. Marca
+   como problema cualquier sigla de industria, nombre de tecnología/protocolo
+   o término que describa CÓMO se hizo algo técnicamente en vez de QUÉ logró
+   o QUÉ problema resolvió (ej.: "pipeline ETL con triggers S3", "BGP con
+   route reflectors", "VLANs 802.1Q") — salvo que sea tan conocido que no
+   necesite explicación (Excel, SAP). Para cada uno, propone la reescritura en
+   lenguaje llano orientado a impacto.
+8. **Decisión de renta actual trazada**: `proceso.js` debe traer un comentario
+   `// Renta actual: SÍ/NO se muestra (decisión de la consultora)`. Si falta,
+   es **bloqueante** — significa que esa pregunta (siempre obligatoria por
+   `AskUserQuestion`, nunca asumible) puede no haberse hecho, con o sin
+   `rentaActual` poblado en los candidatos.
 
 Devuelve un reporte accionable: lista de problemas ordenada por severidad
 (bloqueante / mayor / menor), cada uno con el campo exacto del proceso.js, lo
