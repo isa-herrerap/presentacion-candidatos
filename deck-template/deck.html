@@ -274,7 +274,7 @@ SLIDES.push({file:'comparativa.html', title:'Comparativa de candidatos',    logo
 // proceso de Mandomedio y vive en la propia lámina (ver pasos.html).
 SLIDES.push({file:'pasos.html',       title:'Próximos pasos'});
 // BUILD: súbelo cada vez que edites una diapo (cache-bust del iframe → el navegador recarga el slide nuevo)
-const BUILD = '2026-09-10-2';
+const BUILD = '2026-09-10-6';
 const frame = document.getElementById('frame');
 const wrap = document.getElementById('frameWrap');
 const chromes = document.querySelectorAll('.chrome');
@@ -557,7 +557,7 @@ document.getElementById('prev').onclick = prev;
 // A diferencia de next()/prev(), estos NO pasan por sendKey: van directo a
 // go(), la misma función que usan los puntitos y Home/End. Por eso saltan la
 // lámina completa de una, sin consumir sus pasos internos.
-document.getElementById('skipNext').onclick = function(){ go(i+1); };
+document.getElementById('skipNext').onclick = function(){ go(i+1, true); };
 document.getElementById('skipPrev').onclick = function(){ go(i-1, true); };
 
 // Las teclas que no navegan entre láminas son del deck completo, y llegan por

@@ -101,19 +101,29 @@
      tan largo que casi no sobra aire, igual queda ese mínimo entre secciones
      en vez de que se toquen. */
   /* overflow-y:auto es la red de seguridad para cuando las seis secciones no
-     entran en el 100% del alto (pantalla angosta/baja, o texto largo del
+     entran en el alto disponible (pantalla angosta/baja, o texto largo del
      candidato empujando `justify-content:space-between` más allá de lo que
      cabe): antes se recortaba en silencio contra `.slide{overflow:hidden}` —
      incluido, en el peor caso, el botón "Ver currículum" del final. Mismo
      patrón que `.cbody` más abajo: no cambia nada cuando el contenido cabe
      (que es el caso normal), sólo entra como fallback. overflow-x:hidden
      explícito y no implícito — ver la nota de acoplamiento de ejes en
-     `.cbody`. */
-  .rail{ position:absolute; top:0; left:0; width:32%; height:100%;
+     `.cbody`.
+     OJO con `bottom` en vez de `height:100%`: un padding-bottom por sí solo
+     NO alcanza para reservarle la banda al logo del shell. Un padding sólo
+     define dónde se acomoda el contenido que SÍ cabe; el contenido que
+     desborda sigue fluyendo hacia abajo y el corte real de `overflow-y:auto`
+     ocurre en el borde de la CAJA (acá, el alto completo de la lámina), no en
+     el borde del padding. Con pantallas bajas y ficha larga, esto dejaba
+     "Formación" asomándose detrás del isotipo — un padding no es un tope.
+     `bottom:` en cambio ACHICA la caja misma: el riel termina de verdad antes
+     de esa banda, así que no hay scroll que pueda llevar contenido detrás del
+     logo. El valor es el mismo clamp que antes usaba el padding — ya estaba
+     calibrado contra el alto del logo (ver #deckLogo en deck.html). */
+  .rail{ position:absolute; top:0; left:0; width:32%; bottom:clamp(58px,9.5vh,82px);
     display:flex; flex-direction:column; justify-content:space-between;
     gap:clamp(14px,2vh,20px);
-    padding:clamp(30px,5vh,56px) clamp(24px,2.6vw,40px);
-    padding-bottom:clamp(58px,9.5vh,82px);
+    padding:clamp(30px,5vh,56px) clamp(24px,2.6vw,40px) clamp(14px,2vh,20px);
     overflow-y:auto; overflow-x:hidden; }
   .rail::-webkit-scrollbar{ width:6px; }
   .rail::-webkit-scrollbar-track{ background:transparent; }
