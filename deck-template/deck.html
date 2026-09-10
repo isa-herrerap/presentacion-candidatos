@@ -62,6 +62,21 @@
   #next{right:8px}
   .nav svg{width:30px;height:30px}
 
+  /* Flechas de SALTO (esquina superior derecha): pasan a la lámina completa
+     siguiente/anterior de un solo clic, sin consumir los pasos internos que sí
+     respetan #prev/#next. Sirven para revisar el deck rápido; el recorrido
+     paso a paso sigue intacto para cuando se presenta al cliente. Mismo
+     lenguaje visual que #cvClose (círculo con borde) porque es el mismo tipo
+     de control: un utilitario de esquina, no parte de la narrativa. */
+  .skip{position:absolute;top:20px;width:36px;height:36px;z-index:11;
+    cursor:pointer;background:transparent;border:1px solid var(--panel-br);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    opacity:.55;transition:opacity .2s,background-color .2s}
+  .skip:hover{opacity:1;background:var(--panel-hover)}
+  #skipPrev{right:64px}
+  #skipNext{right:20px}
+  .skip svg{width:18px;height:18px}
+
   /* El logo vive en el SHELL, no en las láminas: se monta una sola vez, así
      nunca se re-anima ni cambia de posición al pasar de lámina. Lo único que
      ocurre es un crossfade entre la versión positiva y la negativa cuando
@@ -162,6 +177,8 @@
   </div>
   <button class="nav chrome" id="prev" aria-label="anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
   <button class="nav chrome" id="next" aria-label="siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+  <button class="skip chrome" id="skipPrev" type="button" title="Saltar a la lámina anterior completa" aria-label="saltar a la lámina anterior completa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 5l-6 7 6 7"/><path d="M12 5l-6 7 6 7"/></svg></button>
+  <button class="skip chrome" id="skipNext" type="button" title="Saltar a la lámina siguiente completa" aria-label="saltar a la lámina siguiente completa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 5l6 7-6 7"/><path d="M12 5l6 7-6 7"/></svg></button>
   <div class="chrome" id="pager"></div>
   <div class="chrome" id="dots"></div>
   <div id="deckLogo">
@@ -403,7 +420,7 @@ function go(n, atEnd){
 // ni clics. Sin esto el Tab se escaparía del panel a las flechas y los puntos
 // del shell, que están tapados por el velo — foco invisible, que es peor que
 // no tener foco.
-const capasDeAtras = ['stage','prev','next','dots','pager'].map(id=>document.getElementById(id));
+const capasDeAtras = ['stage','prev','next','dots','pager','skipPrev','skipNext'].map(id=>document.getElementById(id));
 function inerte(on){
   capasDeAtras.forEach(n=>{ if(!n) return; if(on) n.setAttribute('inert',''); else n.removeAttribute('inert'); });
 }
@@ -537,6 +554,11 @@ window.addEventListener('message', function(e){
 
 document.getElementById('next').onclick = next;
 document.getElementById('prev').onclick = prev;
+// A diferencia de next()/prev(), estos NO pasan por sendKey: van directo a
+// go(), la misma función que usan los puntitos y Home/End. Por eso saltan la
+// lámina completa de una, sin consumir sus pasos internos.
+document.getElementById('skipNext').onclick = function(){ go(i+1); };
+document.getElementById('skipPrev').onclick = function(){ go(i-1, true); };
 
 // Las teclas que no navegan entre láminas son del deck completo, y llegan por
 // dos vías: el teclado del shell o un 'cmd' que reenvía la lámina cuando el
