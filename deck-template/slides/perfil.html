@@ -100,11 +100,25 @@
      texto traiga el candidato. `gap` es el piso: si algún día el contenido es
      tan largo que casi no sobra aire, igual queda ese mínimo entre secciones
      en vez de que se toquen. */
+  /* overflow-y:auto es la red de seguridad para cuando las seis secciones no
+     entran en el 100% del alto (pantalla angosta/baja, o texto largo del
+     candidato empujando `justify-content:space-between` más allá de lo que
+     cabe): antes se recortaba en silencio contra `.slide{overflow:hidden}` —
+     incluido, en el peor caso, el botón "Ver currículum" del final. Mismo
+     patrón que `.cbody` más abajo: no cambia nada cuando el contenido cabe
+     (que es el caso normal), sólo entra como fallback. overflow-x:hidden
+     explícito y no implícito — ver la nota de acoplamiento de ejes en
+     `.cbody`. */
   .rail{ position:absolute; top:0; left:0; width:32%; height:100%;
     display:flex; flex-direction:column; justify-content:space-between;
     gap:clamp(14px,2vh,20px);
     padding:clamp(30px,5vh,56px) clamp(24px,2.6vw,40px);
-    padding-bottom:clamp(58px,9.5vh,82px); }
+    padding-bottom:clamp(58px,9.5vh,82px);
+    overflow-y:auto; overflow-x:hidden; }
+  .rail::-webkit-scrollbar{ width:6px; }
+  .rail::-webkit-scrollbar-track{ background:transparent; }
+  .rail::-webkit-scrollbar-thumb{ background:var(--hair12); border-radius:3px; }
+  .rail:hover::-webkit-scrollbar-thumb{ background:var(--w45); }
 
   .name-flip{ width:fit-content; transform-origin:top left;
     transition:transform .85s var(--eio); }
@@ -1047,6 +1061,7 @@
       var nameFlip = document.getElementById('nameFlip');
       var tesisFlip = document.getElementById('tesisFlip');
       var stageZone = document.querySelector('.stage-zone');
+      var rail = document.querySelector('.rail');
 
       // 1 ficha+formación · 2 cargo/empresa · 3 tesis al centro · 4 la tesis
       // viaja al rail (y ahí mismo aparece el botón del currículum) · 5
@@ -1122,6 +1137,12 @@
       if (document.fonts && document.fonts.ready){ document.fonts.ready.then(measure); }
       var rz;
       window.addEventListener('resize', function(){
+        // Si el rail quedó scrolleado (ver overflow-y en .rail) y justo ahí
+        // llega un resize, medir con el nombre fuera de vista calcularía el
+        // viaje del hero desde una posición que no es la suya. measure() lee
+        // la posición ACTUAL del nombre, así que hay que devolver el scroll
+        // antes de medir — el nombre siempre vive al tope del rail.
+        if (rail) rail.scrollTop = 0;
         clearTimeout(rz); rz = setTimeout(measure, 120);
       });
 

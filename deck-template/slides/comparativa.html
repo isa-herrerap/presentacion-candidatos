@@ -116,13 +116,35 @@ body{
 .btn-clear:hover{background:var(--chip); border-color:var(--border-2)}
 
 /* ---------- matrix ---------- */
+/* La matriz ya no fuerza a las columnas a caber en el ancho disponible: eso es
+   lo que las apretaba hasta que el texto partía en más líneas de las que su
+   fila tenía presupuestadas (ver --h0 y el alto de cada .cell, pensados para
+   el ancho de columna del baseline 1280×720) y esas líneas de más se recortaban
+   a la mitad, encimadas con la fila de arriba — invisible en el baseline,
+   catastrófico en una pantalla angosta. En vez de seguir achicando columnas,
+   `.col` pone un piso (ver más abajo) y ES LA MATRIZ la que scrollea en
+   horizontal cuando no entran todas a ese piso. overflow-x/-y por separado (no
+   el shorthand `overflow`) a propósito: declarados juntos y explícitos, para
+   no repetir la trampa de acoplamiento de ejes ya documentada en perfil.html
+   (fijar sólo uno promueve el otro a auto solo). */
 .matrix{
   flex:1 1 auto; min-height:0; display:flex; align-items:stretch;
-  background:var(--card); border:1px solid var(--border); border-radius:20px; overflow:hidden;
+  background:var(--card); border:1px solid var(--border); border-radius:20px;
+  overflow-x:auto; overflow-y:hidden;
 }
+/* Scrollbar propio, discreto y del tema — igual que el de `.cbody` en
+   perfil.html (mismo problema: contenido que puede no caber). */
+.matrix::-webkit-scrollbar{ height:6px; }
+.matrix::-webkit-scrollbar-track{ background:transparent; }
+.matrix::-webkit-scrollbar-thumb{ background:var(--border-2); border-radius:3px; }
+.matrix:hover::-webkit-scrollbar-thumb{ background:var(--sec); }
 .labels{
   flex:0 0 clamp(150px,13vw,182px); display:flex; flex-direction:column;
   background:var(--surface); border-right:1px solid var(--border); order:0;
+  /* Fija la columna de criterios mientras el resto scrollea: sin esto, al
+     desplazarse para ver a los últimos candidatos se pierde de vista a qué
+     fila corresponde cada celda. */
+  position:sticky; left:0; z-index:2;
 }
 .lab-head{flex:0 0 var(--h0); display:flex; align-items:flex-end; padding:12px}
 .lab-head .t{font-family:var(--rhd); font-weight:700; font-size:clamp(12px,1.35vh,13.5px); letter-spacing:1px; text-transform:uppercase; color:var(--muted)}
@@ -151,8 +173,14 @@ body{
 :root{--h0:clamp(124px,14vh,130px)}
 
 /* candidate column */
+/* min-width:200px es el piso: es aprox. el ancho de columna del baseline
+   1280×720 a 5 candidatos (con el que se midió --h0 y el resto de los altos
+   de fila), así que por debajo de él el contenido nunca se envuelve en más
+   líneas de las presupuestadas. Con este piso la columna deja de encogerse
+   más allá de un punto legible; lo que no entra lo resuelve el scroll
+   horizontal de `.matrix`, no el achique de la columna. */
 .col{
-  flex:1 1 0; min-width:0; position:relative; border-right:1px solid var(--border);
+  flex:1 1 0; min-width:200px; position:relative; border-right:1px solid var(--border);
   transition:opacity .45s ease, flex-grow .5s ease, flex-basis .5s ease;
 }
 .col:last-child{border-right:none}

@@ -504,6 +504,18 @@
       // de una barra: con tres gráficos en una fila la ranura es angosta y
       // "Consultoras/Privado" no tiene ni un espacio donde partirse — de una
       // sola línea se le monta encima al rótulo vecino.
+      // Un TOKEN solo (sin espacio ni "/" donde partirse) puede seguir siendo
+      // más largo que maxChars — "Psicólogo", "Asistente" — y antes se metía
+      // igual, entero, a su propia línea: el cálculo de maxChars existe
+      // precisamente para que eso no pase, así que dejarlo pasar sin más lo
+      // volvía letra muerta en la ranura angosta de tres gráficos por fila
+      // (rótulo montado sobre el del vecino). recortar() es el mismo tope que
+      // ya se usaba para la segunda línea fusionada (línea ~529), aplicado acá
+      // a CUALQUIER token, no sólo a ese caso.
+      function recortar(t, maxChars){
+        return t.length > maxChars ? t.slice(0, maxChars - 1) + '…' : t;
+      }
+
       function partirRotulo(texto, maxChars){
         var tokens = [];
         String(texto).split(' ').forEach(function(palabra){
@@ -517,10 +529,10 @@
         var lineas = [];
         tokens.forEach(function(t){
           if (!t) return;
-          if (!lineas.length){ lineas.push(t); return; }
+          if (!lineas.length){ lineas.push(recortar(t, maxChars)); return; }
           var actual = lineas[lineas.length - 1];
           if (unir(actual, t).length <= maxChars) lineas[lineas.length - 1] = unir(actual, t);
-          else lineas.push(t);
+          else lineas.push(recortar(t, maxChars));
         });
         if (!lineas.length) return [''];
 
