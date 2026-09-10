@@ -233,13 +233,18 @@ del perfil.
 | `validado` | bool | screening col `Validación de titulo` | **Puede no existir la columna** (Auto Summit) o traer estados no binarios ("Solicitado", "pendiente") → `false` (declarado) y preguntar a la consultora. `true` SOLO con "validado" explícito. |
 
 **El lenguaje de la validación tiene DOS estados y solo dos:** `true` →
-"✓ Validado", `false` → "Pendiente". No hay tercer estado, ni notas al margen,
-ni íconos de alerta. "Pendiente" va sin ícono porque describe algo que le falta
-a **Mandomedio** (verificar el título), no una falta del candidato: el triángulo
-de peligro que llevaba antes se leía como "hay un problema con esta persona", y
-el cliente mira esa lámina mientras decide. Por lo mismo se **eliminó el campo
-`nota`** de `estudios[]`: era la puerta por la que volvía un tercer estado
-escrito a mano, y ninguna lámina lo renderiza.
+"✓ Título validado", `false` → "Pendiente validación de título". No hay tercer
+estado, ni notas al margen, ni íconos de alerta. El estado "pendiente" va sin
+ícono porque describe algo que le falta a **Mandomedio** (verificar el
+título), no una falta del candidato — el copy es explícito sobre qué está
+pendiente (la validación) para que no se lea como que a la persona le falta
+titularse. Por lo mismo se **eliminó el campo `nota`** de `estudios[]`: era la
+puerta por la que volvía un tercer estado escrito a mano, y ninguna lámina lo
+renderiza.
+
+Este estado **sólo se muestra en el perfil individual** del candidato (la pill
+junto a `estudios[0]`). La comparativa no lo muestra: ahí la celda "Estudios"
+trae únicamente carrera + institución.
 
 ### `criterios` (objeto `key → valor`)
 

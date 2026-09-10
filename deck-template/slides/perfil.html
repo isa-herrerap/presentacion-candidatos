@@ -258,9 +258,14 @@
     font-size:clamp(14.5px,2vh,17px); line-height:1.32; color:var(--ink); }
   .estudio-txt .inst{ font-weight:400; color:var(--w75); }
   /* Este era el peor caso de la lámina: 9 px FIJOS, o sea 9 px reales en
-     cualquier pantalla. Pasa a clamp con piso 12. */
+     cualquier pantalla. Pasa a clamp con piso 12 (el mínimo del proyecto:
+     no puede bajar de ahí). El techo se mantiene pegado al piso a propósito
+     — no es un texto que compita en peso visual con el título; es un dato
+     secundario ("¿ya está validado?") y se lee bien chico. El copy es más
+     largo que antes ("PENDIENTE VALIDACIÓN DE TÍTULO"), así que el tamaño
+     chico también ayuda a que no le gane espacio a la carrera. */
   .val{ flex:none; font-family:"Inter",sans-serif; font-weight:500;
-    font-size:clamp(12px,1.65vh,14px);
+    font-size:clamp(12px,1.3vh,12.5px);
     text-transform:uppercase; letter-spacing:1px; color:var(--w45); white-space:nowrap; }
   .val.ok{ color:var(--peach); }
 
@@ -640,15 +645,15 @@
 
       <div class="foot-block-2">
         <div class="blk-label fic fic3">Formación</div>
-        <!-- Una fila por estudio. `.val.ok` = "✓ VALIDADO", verificado por
-             Mandomedio; `.val` a secas = "PENDIENTE", todavía sin respaldo.
-             Dice PENDIENTE y no "declarado" porque describe el estado de la
-             verificación (algo que le falta a Mandomedio), no una duda sobre
-             la candidata. La pill solo va en estudios[0] (el título base,
-             por contrato de SCHEMA.md): diplomados y magísteres no la
-             llevan. OJO: la comparativa tiene su propio lenguaje para
-             esto ("Sin validar") y no se toca; el dato de origen sigue
-             siendo el mismo `validado:true|false`. -->
+        <!-- Una fila por estudio. `.val.ok` = "✓ TÍTULO VALIDADO", verificado
+             por Mandomedio; `.val` a secas = "PENDIENTE VALIDACIÓN DE
+             TÍTULO", todavía sin respaldo. El copy es explícito sobre QUÉ
+             está pendiente (la validación, un trámite de Mandomedio) para
+             que no se lea como que a la candidata le falta titularse. La
+             pill solo va en estudios[0] (el título base, por contrato de
+             SCHEMA.md): diplomados y magísteres no la llevan. La comparativa
+             ya NO muestra este estado (sólo carrera + institución); el dato
+             de origen sigue siendo el mismo `validado:true|false`. -->
         <ul class="estudios"></ul>
       </div>
 
@@ -915,7 +920,7 @@
         if (e.institucion) txt.appendChild(el('span','inst', '· ' + e.institucion));
         li.appendChild(txt);
         if (i === 0){
-          li.appendChild(e.validado ? el('span','val ok','✓ Validado') : el('span','val','Pendiente'));
+          li.appendChild(e.validado ? el('span','val ok','✓ Título validado') : el('span','val','Pendiente validación de título'));
         }
         ulEst.appendChild(li);
       });

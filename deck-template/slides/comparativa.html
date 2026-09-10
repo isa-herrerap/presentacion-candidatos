@@ -251,9 +251,6 @@ body{
 .pill svg{display:block}
 .pill.yes{color:var(--pos); background:var(--pos-bg)}
 .pill.no{color:var(--sec); background:var(--chip); border:1px solid var(--border)}
-/* Estado de validación PENDIENTE. La clase se llamaba `warn` y el nombre
-   invitaba a tratarlo como advertencia: no lo es. Ver la regla en renderCell(). */
-.pill.pend{color:var(--accent-txt); background:rgba(253,101,13,.10)}
 /* Pill de comuna, en el encabezado de la columna. Va `inline-block` y no
    `inline-flex` como las demás (no lleva ícono) para poder acotarla al ancho
    de la columna: "Cobquecura / Chillán" entra completa en una columna normal,
@@ -365,9 +362,11 @@ body{
 
   // ---- iconos SVG inline (nunca emojis) ----
   // Acá NO hay ícono de alerta, y es a propósito: esta lámina no advierte de
-  // nada sobre un candidato. El triángulo de peligro que acompañaba a la
-  // validación pendiente se eliminó junto con su uso (ver renderCell); si
-  // vuelve a aparecer en este objeto, algo se salió de la regla.
+  // nada sobre un candidato. La pill de validación de título (con su
+  // triángulo de peligro en la versión vieja) se eliminó por completo de
+  // esta lámina — ese estado sólo se muestra en el perfil individual (ver
+  // renderCell, case 'est'); si vuelve a aparecer acá, algo se salió de la
+  // regla.
   var ICON = {
     check:'<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M13 4.6 6.6 12 3 8.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     minus:'<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 8h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
@@ -383,7 +382,6 @@ body{
 
   // ---- CANDS: PROCESO.candidatos proyectado a lo que necesita la matriz ----
   // estudios[0] es el título principal: es el único que muestra esta lámina.
-  // `validado` viaja como titulo.ok porque es la pill que va junto a la carrera.
   var CANDS = (P.candidatos || []).map(function(c){
     var est = (c.estudios && c.estudios[0]) || {};
     return {
@@ -401,12 +399,11 @@ body{
       // estira: la forma corta es parte del contrato (ver data/proceso.js).
       cargo: c.cargoCorto || c.cargoActual || '',
       empresa: c.empresaActual || '',
+      // El estado de validación del título (`estudios[0].validado`) no se
+      // muestra en esta lámina: sólo en el perfil individual. Acá la
+      // comparativa es entre candidatos, y ese dato es un pendiente del
+      // PROCESO (ver perfil.html), no algo que distinga a uno de otro.
       est: {c: est.titulo || '', i: est.institucion || ''},
-      // Sólo el booleano: la validación tiene DOS estados y nada más (ver
-      // renderCell). El campo `estudios[].nota` que existía para acotar el
-      // estado pendiente ya no se lee — era la puerta por la que volvía un
-      // tercer estado escrito a mano.
-      titulo: {ok: !!est.validado},
       criterios: c.criterios || {}
     };
   });
@@ -474,25 +471,11 @@ body{
                  : '<span class="pill no est-lab">'+ICON.minus+'Último cargo</span>')+
                (c.empresa ? '<span class="cargo-e">'+esc(c.empresa)+'</span>' : '');
       case 'est':
-        // Sin estudios cargados no se dice nada del estado de validación
-        // (suena a reproche cuando en realidad falta el dato): va el guion.
+        // Sin estudios cargados no se dice nada (suena a reproche cuando en
+        // realidad falta el dato): va el guion. El estado de validación del
+        // título no se muestra acá — ver el comentario en CANDS más arriba.
         if(!c.est.c) return noPill('—');
-        // REGLA — el estado de una validación tiene DOS valores y sólo dos:
-        // "Validado" o "Pendiente". Nada de un tercer estado, ni notas al
-        // margen, ni íconos de alerta.
-        //   · El ✓ de "Validado" se queda: es marca de confirmación.
-        //   · "Pendiente" va SIN ícono. Antes decía "Sin validar" con un
-        //     triángulo de peligro, y eso se lee como "hay un problema con
-        //     este candidato" cuando lo único que dice es que Mandomedio
-        //     todavía no verificó el título. Es un pendiente del PROCESO, no
-        //     una falta del candidato — y el cliente está mirando esta lámina
-        //     mientras decide, así que la diferencia importa.
-        // Las filas de Sí/No (¿trabajando hoy?, movilización, indicadores) son
-        // otra pregunta y su lenguaje no se toca.
-        var val = c.titulo.ok
-          ? '<span class="pill yes">'+ICON.check+'Validado</span>'
-          : '<span class="pill pend">Pendiente</span>';
-        return '<div class="est-head"><span class="est-c">'+esc(c.est.c)+'</span>'+val+'</div>'+
+        return '<div class="est-head"><span class="est-c">'+esc(c.est.c)+'</span></div>'+
                (c.est.i ? '<span class="est-i">'+esc(c.est.i)+'</span>' : '');
     }
     return '';
