@@ -125,6 +125,16 @@
     gap:clamp(14px,2vh,20px);
     padding:clamp(30px,5vh,56px) clamp(24px,2.6vw,40px) clamp(14px,2vh,20px);
     overflow-y:auto; overflow-x:hidden; }
+  /* Dos momentos de la coreografía sacan algo del riel para agrandarlo al
+     centro de la pantalla: el nombre en "hero" (paso 0) y la tesis en
+     "s-tesis" (paso 3, antes de aterrizar en s-park). El overflow-x:hidden
+     de arriba existe para el texto largo del estado YA revelado y en esos
+     dos momentos lo corta en seco. `.rail.escape` es la válvula: el script
+     la prende mientras el elemento está agrandado Y mientras dura el viaje
+     de vuelta (ver syncEscape() en el script) — sin esa segunda parte, el
+     permiso se cerraba apenas arrancaba la transición de encogerse y el
+     viaje se veía cortado a mitad de camino, no como un despliegue limpio. */
+  .rail.escape{ overflow:visible; }
   .rail::-webkit-scrollbar{ width:6px; }
   .rail::-webkit-scrollbar-track{ background:transparent; }
   .rail::-webkit-scrollbar-thumb{ background:var(--hair12); border-radius:3px; }
@@ -1100,6 +1110,13 @@
 
       function hero(){ slide.classList.toggle('hero', idx === 0); }
 
+      // Ver el comentario de `.rail.escape` en el CSS. idx===0 es el nombre
+      // agrandado (hero); idx===3 es la tesis agrandada (s-tesis ya sumado,
+      // s-park todavía no) — el único otro momento en que algo del riel
+      // vive fuera de sus límites normales.
+      var escapeTimer = null;
+      function syncEscape(){ rail.classList.toggle('escape', idx === 0 || idx === 3); }
+
       function measure(){
         var wasHero = slide.classList.contains('hero');
         slide.classList.add('measuring');
@@ -1141,6 +1158,7 @@
       }
       measure();
       hero();
+      syncEscape();
       if (startAtEnd){
         void slide.offsetWidth;                 // fija el estado final sin animar
         slide.classList.remove('no-anim');
@@ -1178,10 +1196,24 @@
         if (dir > 0){
           if (animating) flush();
           if (idx >= STEPS.length) return false;
+          var seEncogia = (idx === 0 || idx === 3);   // ¿dejamos un estado agrandado?
           slide.classList.add(STEPS[idx]);
           idx++;
           hero();
           startTimer(idx);
+          if (seEncogia){
+            // hero()/syncEscape() ya cerrarían el permiso acá mismo porque el
+            // idx nuevo no es ni 0 ni 3 — pero el nombre/la tesis TODAVÍA se
+            // están encogiendo de vuelta a su lugar (la transición CSS dura
+            // lo mismo que este paso, ver DUR[]), así que hay que sostenerlo
+            // hasta que el viaje termine de verdad, o el riel los corta a
+            // mitad de camino en vez de dejarlos llegar en paz.
+            rail.classList.add('escape');
+            clearTimeout(escapeTimer);
+            escapeTimer = setTimeout(syncEscape, DUR[idx] || 1200);
+          } else {
+            syncEscape();
+          }
           return true;
         }
         if (dir < 0){
@@ -1191,6 +1223,8 @@
           slide.classList.add('no-anim');
           slide.classList.remove(STEPS[idx]);
           hero();
+          clearTimeout(escapeTimer);
+          syncEscape();                             // retroceso es instantáneo (no-anim): no hay viaje que sostener
           void slide.offsetWidth;
           slide.classList.remove('no-anim');
           return true;
