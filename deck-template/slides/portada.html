@@ -181,21 +181,21 @@
       // ---- Título: el cargo, con la subcadena meta.cargoAccent en naranjo.
       // Se arma con nodos de texto (no innerHTML) para que un cargo con & o <
       // no rompa el markup. Si cargoAccent no viene o no aparece en el cargo,
-      // el título va entero en color heading.
+      // el título va entero en color heading. Sin punto final: el cargo es un
+      // título/etiqueta, no una oración.
       var h1 = document.querySelector('.cover-title');
       var cargo = String(meta.cargo || '');
       var acento = meta.cargoAccent ? String(meta.cargoAccent) : '';
       var corte = acento ? cargo.indexOf(acento) : -1;
-      var punto = /\.$/.test(cargo) ? '' : '.';   // no duplicar el punto si ya viene escrito
       if (corte >= 0){
         var span = document.createElement('span');
         span.className = 'accent';
         span.textContent = acento;
         h1.appendChild(document.createTextNode(cargo.slice(0, corte)));
         h1.appendChild(span);
-        h1.appendChild(document.createTextNode(cargo.slice(corte + acento.length) + punto));
+        h1.appendChild(document.createTextNode(cargo.slice(corte + acento.length)));
       } else {
-        h1.textContent = cargo + punto;
+        h1.textContent = cargo;
       }
 
       document.querySelector('.cover-org').textContent = meta.empresa || '';
