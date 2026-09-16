@@ -438,7 +438,11 @@
       // pantalla, así que estos números son el tamaño que se ve. Piso de la
       // política del deck: ningún texto visible bajo 12 px.
       var FS_VAL = 15;    // el número sobre la columna: es el dato, manda
-      var FS_LBL = 14;    // el nombre de la categoría, bajo el eje
+      var FS_LBL = 14;    // el nombre de la categoría, bajo el eje — se puede
+                          // achicar hasta el piso (12) si el rótulo no cabe;
+                          // ver ajustarTipografiaEtiquetas().
+      var M_ABAJO = 50;   // margen inferior del gráfico: crece junto con FS_LBL
+                          // cuando un rótulo necesita más de 2 líneas.
       var FS_TICK = 13;   // los cortes del eje Y, el texto más de servicio
       // Van fijos y no con clamp como los del encabezado: la card no se ensancha
       // nunca (el contenedor tope a 1140 px, o sea ~327 por gráfico), así que
@@ -535,12 +539,50 @@
           else lineas.push(recortar(t, maxChars));
         });
         if (!lineas.length) return [''];
-
-        if (lineas.length > 2){
-          lineas = [lineas[0], lineas.slice(1).reduce(function(a, b){ return unir(a, b); })];
-          if (lineas[1].length > maxChars) lineas[1] = lineas[1].slice(0, maxChars - 1) + '…';
-        }
+        // Sin tope de líneas: si el rótulo no cabe ni de a una palabra por
+        // línea, ajustarTipografiaEtiquetas() ya habrá achicado FS_LBL (y
+        // crecido el margen) antes de llegar acá. Lo que no calce ni así queda
+        // truncado con "…" — el <title> del grupo lo muestra completo al pasar
+        // el mouse.
         return lineas;
+      }
+
+      // Ajusta FS_LBL (y M_ABAJO en línea con él) ANTES de dibujar los
+      // gráficos, con el mismo valor para los 3, para que sigan siendo
+      // comparables entre sí (ver nota de "escala compartida" más arriba).
+      // Sólo achica la letra o crece el margen cuando el rótulo más largo de
+      // ESTE proceso no entra a 14px en 2 líneas — con rótulos cortos (tramos,
+      // "Psicólogo", etc.) el resultado es exactamente el de siempre.
+      function ajustarTipografiaEtiquetas(anchoLienzo){
+        var plotW = anchoLienzo - 36 - 6; // izquierda + derecha, fijos
+        var ranuraMinima = DIMS.reduce(function(min, d){
+          return Math.min(min, plotW / d.valores.length);
+        }, Infinity);
+
+        var candidatos = [14, 13, 12];
+        var elegido = null;
+        for (var c = 0; c < candidatos.length; c++){
+          var fs = candidatos[c];
+          var maxChars = Math.max(6, Math.floor(ranuraMinima / (fs * ANCHO_CHAR)));
+          var maxLineas = 1, truncoAlgo = false;
+          DIMS.forEach(function(d){
+            d.valores.forEach(function(v){
+              var lineas = partirRotulo(v.nombre, maxChars);
+              maxLineas = Math.max(maxLineas, lineas.length);
+              lineas.forEach(function(l){ if (/…$/.test(l)) truncoAlgo = true; });
+            });
+          });
+          elegido = { fs: fs, maxLineas: maxLineas, trunco: truncoAlgo };
+          // A 14px, el caso de siempre (≤2 líneas, nada truncado): no tocar
+          // nada, mismo resultado que antes de este ajuste.
+          if (fs === 14 && maxLineas <= 2 && !truncoAlgo) break;
+          if (!truncoAlgo) break; // ya entra completo, no hace falta achicar más
+        }
+
+        FS_LBL = elegido.fs;
+        M_ABAJO = elegido.maxLineas <= 2
+          ? 50
+          : 50 + (elegido.maxLineas - 2) * Math.round(elegido.fs * 1.2);
       }
 
       // Columnas CON EJE Y ROTULADO. El eje arranca SIEMPRE en 0 (truncarlo
@@ -560,7 +602,7 @@
         // - izquierda 36 y derecha 6: se le devuelve ancho a la ranura para que
         //   los rótulos más grandes no se toquen. Alcanza de sobra: el corte más
         //   largo del eje ("300" a 13 px) mide ~24 px y quedan 8 de aire.
-        var M = { arriba: 24, derecha: 6, abajo: 50, izquierda: 36 };
+        var M = { arriba: 24, derecha: 6, abajo: M_ABAJO, izquierda: 36 };
         var plotL = M.izquierda, plotR = W - M.derecha;
         var plotT = M.arriba, plotB = H - M.abajo;
         var plotW = plotR - plotL, plotH = plotB - plotT;
@@ -622,6 +664,9 @@
           var x = centro - anchoCol / 2;
 
           var g = svgNodo('g', { class: 'slot', role: 'button', tabindex: 0 });
+          // Respaldo final si el rótulo igual quedó truncado: el navegador
+          // muestra el nombre completo al pasar el mouse sobre la columna.
+          g.appendChild(svgNodo('title', {}, val.nombre));
 
           // Área de clic: toda la altura de la ranura. Una columna baja es una
           // línea de pocos píxeles — imposible de apuntar en vivo si el blanco
@@ -785,6 +830,7 @@
 
       function montarGraficos(){
         LIENZO = medirLienzo();
+        ajustarTipografiaEtiquetas(LIENZO.W);
         cards.forEach(function(c){
           while (c.body.firstChild) c.body.removeChild(c.body.firstChild);
           c.graf = crearGrafico(c.dim, LIENZO);

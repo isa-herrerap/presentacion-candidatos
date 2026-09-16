@@ -131,7 +131,7 @@ de arriba). Lo que se puebla por proceso son los `valores[]`.
 |---|---|---|---|---|
 | `id` | string | ✔ | **fijo** | La llave que usa cada fila de `contexto.candidatos`. Los cuatro ids son fijos: `origen`, `experiencia`, `cargo`, `empresa`. |
 | `titulo` | string | ✔ | **fijo** | Encabezado de la card del gráfico. También estandarizado: "Origen del candidato", "Años de experiencia", "Cargo actual", "Empresa actual". |
-| `valores[]` | 2–4 × `{nombre, slot}` | ✔ | derivable de screening | **Lo único que cambia por proceso.** El orden de este arreglo es el **orden de las columnas**: en tramos va 0-3 antes que 8+ aunque sea la más chica, porque el eje es una escala, no un ranking. `slot` fija el color: `c1` naranjo (la serie protagonista, normalmente la mayor), `c2` / `c3` secundarios. Solo hay tres slots; con cuatro valores, uno se repite. Para `origen` los valores son siempre "Postulaciones" y "Hunting". |
+| `valores[]` | 2–4 × `{nombre, slot}` | ✔ | derivable de screening | **Lo único que cambia por proceso.** El orden de este arreglo es el **orden de las columnas**: en tramos va 0-3 antes que 8+ aunque sea la más chica, porque el eje es una escala, no un ranking. `slot` fija el color: `c1` naranjo (la serie protagonista, normalmente la mayor), `c2` / `c3` secundarios. Solo hay tres slots; con cuatro valores, uno se repite. Para `origen` los valores son siempre "Postulaciones" y "Hunting". En `empresa`, prefiere el nombre de las empresas directo ("Carozzi, Ariztía, Agrosuper") en vez de envolverlo en una etiqueta de rubro genérica ("Sector Alimentos (Carozzi, Ariztía, Agrosuper)") — se lee más limpio y el rubro ya queda claro por los nombres. |
 
 Los `nombre` tienen que ser **exactamente** los strings que aparecen en las
 filas de `contexto.candidatos`: el conteo compara texto. Un valor que aparezca
@@ -246,6 +246,19 @@ Este estado **sólo se muestra en el perfil individual** del candidato (la pill
 junto a `estudios[0]`). La comparativa no lo muestra: ahí la celda "Estudios"
 trae únicamente carrera + institución.
 
+**`estudios[]` del perfil se cura por relevancia al cargo, no es el CV
+completo.** Dos casos donde se omite una formación real aunque exista:
+
+- **Un Técnico que el mismo título de Ingeniero/Licenciado ya deja atrás.**
+  Si el candidato tiene Ingeniería/Licenciatura en la misma área y además un
+  Técnico previo (el escalón natural de la carrera), el Técnico no suma en el
+  perfil — se omite. El CV completo (`cv.formacion`) sí lo mantiene: ahí el
+  detalle no estorba.
+- **Formación real pero no acorde al cargo**, aunque sea interesante o
+  diferenciadora (p.ej. un Profesor de Estado que hoy es Ingeniero en
+  Logística). No la metas por "diferenciar" al candidato — si no aporta al
+  cargo, no va en `estudios[]` del perfil.
+
 ### `criterios` (objeto `key → valor`)
 
 Valores de este candidato para las filas variables de la comparativa (ver
@@ -283,6 +296,19 @@ lectura que hizo la consultora de lo relevante. Recurre al CV sólo si el
 screening viene pobre en ese candidato o falta un dato puntual — y aun así,
 reescribe siempre en lenguaje llano, sin jerga ni siglas de industria sin
 explicar.
+
+**La misma prioridad (screening antes que CV) vale para `tesis`.** Al armar
+"en qué destaca", apóyate primero en las Observaciones y el juicio de la
+consultora — ahí suele haber logros y cifras concretas (volumen que movía,
+tamaño del equipo, un sistema que implementó, una automatización que lideró)
+que hacen la tesis más potente y la conectan con los requisitos de ESE cargo.
+No hay una lista fija de qué cifra buscar — cambia según el cargo (toneladas o
+camiones diarios en logística, cartera gestionada en ventas, dotación a cargo
+en operaciones, etc.): la lectura del screening manda, no una categoría
+predefinida. Esto pesa más para candidatos de empresas menos conocidas, donde
+el cliente no tiene una referencia previa de en qué escala trabajaban; para
+candidatos de marcas muy reconocidas (Carozzi, Colun, CCU) el cliente ya
+asume el volumen, así que ahí es menos determinante.
 
 **`PROCESO.requisitosCargo`** — la lista de pills de "Requisitos del cargo"
 es FIJA para todo el deck, no por candidata: vive en un campo nuevo, a nivel
