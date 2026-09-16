@@ -555,6 +555,28 @@ cp -R deck-template "decks/$slug"
 Escribe `decks/<slug>/data/proceso.js` con tus datos (reemplaza completo el
 ejemplo Ñuble). No toques nada más de la copia.
 
+**Antes de pasar al paso 6, dos chequeos de script (segundos, no reemplazan
+la verificación visual — la evitan encontrar errores que se podían prevenir
+antes de abrir el navegador):**
+
+- **`contexto.candidatos` y las duraciones, con script, no a mano.** Si
+  `contexto.candidatos` tiene cientos de filas (el universo completo), armas
+  el archivo con un script (Python/Node) que lo escriba directo a disco —
+  copiar un array grande a mano hacia el archivo final es donde se filtran
+  filas de más o de menos (pasó en el proceso Jefe de Logística - Agricovial:
+  446 filas quedaron en 450 por transcripción manual). Lo mismo con
+  `salidas[].duracion` y `cv.trayectoria[].duracion`: calcúlalas con la
+  fórmula (meses entre el mes de inicio y el de término, sin contar el mes de
+  término) en un script, no a ojo — un error de un mes ahí lo va a encontrar
+  igual el verificador-deck del paso 6, pero corregirlo después cuesta una
+  vuelta completa que se evita calculando bien desde el principio.
+- **Largos de texto contra los límites de SCHEMA.md**, apenas termines de
+  redactar `tesis`, `motivacion`, `evidencia.funciones/logros`,
+  `cv.trayectoria[].bullets` y `conclusion.veredictos[].nota`. Un campo sobre
+  el límite empuja el layout (p.ej. el botón "Ver currículum" queda fuera de
+  la lámina) y si no se pesca con un chequeo de texto, se descubre recién
+  lámina por lámina en el navegador, en el paso 6.
+
 ### 6 · Verificar antes de entregar
 
 1. Lanza el agente **verificador-deck** (está en `.claude/agents/`) con la ruta
@@ -570,6 +592,12 @@ ejemplo Ñuble). No toques nada más de la copia.
      `python3 -m http.server 8000 &` (puerto libre cualquiera), y recuerda
      matarlo al terminar.
    - Navega a `http://localhost:8000/decks/<slug>/deck.html`.
+   - Para avanzar/retroceder, clickea los botones «/» del shell (arriba a la
+     derecha) en vez de clickear dentro del contenido de la lámina: si el
+     clic cae en el iframe, el foco queda ahí y las teclas (flechas, `T`)
+     dejan de llegarle al shell. Después de cada salto espera 1-2 segundos
+     antes de capturar — los gráficos de `contexto-detalle` animan su dibujo
+     y una captura inmediata puede salir en blanco sin ser un bug real.
    - Recorre TODAS las láminas mandando la tecla `→`, consumiendo todos los
      **pasos internos** antes de avanzar a la siguiente: `contexto` entra
      completa y no tiene pasos; `contexto-detalle` revela un gráfico por
